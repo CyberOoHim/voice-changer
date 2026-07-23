@@ -410,12 +410,26 @@
     .chain-bar .chain-step {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 4px 8px;
+      gap: 5px;
+      padding: 4px 9px;
       border-radius: 999px;
       background: rgba(56, 189, 248, .12);
       border: 1px solid rgba(56, 189, 248, .35);
       font-size: .8rem;
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      transition: transform .15s ease, filter .15s ease, background-color .15s ease;
+      font-family: inherit;
+      line-height: 1.2;
+    }
+    .chain-bar .chain-step:hover {
+      filter: brightness(1.15);
+      transform: translateY(-1px);
+    }
+    .chain-bar .chain-step:active {
+      transform: translateY(0);
     }
     .chain-bar .chain-step .ord {
       display: inline-grid;
@@ -426,6 +440,25 @@
       color: #041018;
       font-size: .68rem;
       font-weight: 800;
+      flex-shrink: 0;
+    }
+    .chain-bar .chain-step .chain-step-remove {
+      display: inline-grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      margin-left: 2px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.12);
+      transition: background .15s ease, color .15s ease;
+      flex-shrink: 0;
+    }
+    .chain-bar .chain-step:hover .chain-step-remove {
+      color: #f87171;
+      background: rgba(248, 113, 113, 0.25);
     }
     .chain-bar .chain-arrow { color: var(--muted); }
     .preset-card {
@@ -721,7 +754,7 @@
       <div class="source-actions">
         <button type="button" id="btnRecord" class="btn-primary btn-rec" aria-label="Record from microphone">● Record</button>
         <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
-        <input type="file" id="fileInput" class="sr-only" accept="audio/*,.mp4,.m4a,.m4v,.mov,.webm,video/mp4,video/webm,video/quicktime,video/x-m4v" />
+        <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v" />
       </div>
       <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio or video files here">
         <strong>Drop audio or video</strong>
@@ -1890,24 +1923,29 @@
       const parts = S.presetChain.map((id, i) => {
         const p = getPresetById(id);
         const name = p ? (p.emoji + ' ' + p.name) : id;
+        const displayName = p ? p.name : id;
         return (
-          '<span class="chain-step step-' +
+          '<button type="button" class="chain-step step-' +
           (i + 1) +
-          '"><span class="ord">' +
+          '" data-chain-index="' +
+          i +
+          '" aria-label="Remove ' +
+          displayName +
+          ' from chain"><span class="ord">' +
           (i + 1) +
           '</span> ' +
           name +
-          '</span>'
+          ' <span class="chain-step-remove" title="Remove preset">×</span></button>'
         );
       });
       const hint =
         S.presetChain.length < MAX_PRESET_CHAIN
-          ? ' <span style="margin-left:6px">· tap another to chain (' +
+          ? ' <span style="margin-left:6px">· tap a slot to remove (' +
             S.presetChain.length +
             '/' +
             MAX_PRESET_CHAIN +
             ')</span>'
-          : ' <span style="margin-left:6px">· full chain → sliders (tap a slot to remove)</span>';
+          : ' <span style="margin-left:6px">· full chain (tap a slot to remove)</span>';
       els.chainLabel.innerHTML =
         '<span class="chain-steps">' +
         parts.join('<span class="chain-arrow">→</span>') +
@@ -1953,6 +1991,34 @@
         );
       } else {
         toast('Chain cleared');
+      }
+    }
+
+    function removeFromChainByIndex(index) {
+      if (index < 0 || index >= S.presetChain.length) return;
+      pushHistory();
+      const removedId = S.presetChain[index];
+      const removedPreset = getPresetById(removedId);
+      const name = removedPreset ? (removedPreset.emoji + ' ' + removedPreset.name) : removedId;
+      S.presetChain.splice(index, 1);
+      if (S.presetChain.length) {
+        recomputeFxFromChain();
+      } else {
+        S.fx = defaultFx();
+        S.activePresetId = null;
+      }
+      S.activeCustomId = null;
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      if (S.playing) startPlayback();
+      if (S.presetChain.length) {
+        const names = S.presetChain.map((id) => (getPresetById(id) || {}).name || id);
+        toast('Removed ' + name + ' (Chain: ' + names.join(' → ') + ')');
+      } else {
+        toast('Removed ' + name + ' (Chain cleared)');
       }
     }
 
@@ -2914,7 +2980,7 @@
       try {
         ensureAudioCtx();
         const ab = await blob.arrayBuffer();
-        const decoded = await audioCtx.decodeAudioData(ab.slice(0));
+        const decoded = await safeDecodeAudioData(audioCtx, ab);
         let mono = toMonoBuffer(decoded);
         // Auto peak-normalize (up to 32×). If live Web Audio gain was not used,
         // also bake Mic level here so quiet iPad captures still land loud enough.
@@ -2954,6 +3020,26 @@
     /* =========================================================
        Upload / decode
        ========================================================= */
+    function safeDecodeAudioData(ctx, ab) {
+      return new Promise((resolve, reject) => {
+        let done = false;
+        const onSuccess = (buf) => {
+          if (!done) { done = true; resolve(buf); }
+        };
+        const onError = (err) => {
+          if (!done) { done = true; reject(err); }
+        };
+        try {
+          const res = ctx.decodeAudioData(ab.slice(0), onSuccess, onError);
+          if (res && typeof res.then === 'function') {
+            res.then(onSuccess).catch(onError);
+          }
+        } catch (e) {
+          onError(e);
+        }
+      });
+    }
+
     function isVideoFile(file) {
       const t = (file.type || '').toLowerCase();
       const n = (file.name || '').toLowerCase();
@@ -2975,7 +3061,7 @@
         const ab = await file.arrayBuffer();
         let decoded;
         try {
-          decoded = await audioCtx.decodeAudioData(ab.slice(0));
+          decoded = await safeDecodeAudioData(audioCtx, ab);
         } catch (err) {
           if (isVideoFile(file)) toast('This video codec is unsupported.', 'error');
           else toast("Couldn't read this file. Try a different format.", 'error');
@@ -3889,6 +3975,16 @@
       els.btnUndo.addEventListener('click', undoFx);
       els.btnRedo.addEventListener('click', redoFx);
       els.btnClearChain.addEventListener('click', () => clearPresetChain(false));
+      if (els.chainBar) {
+        els.chainBar.addEventListener('click', (e) => {
+          const btn = e.target.closest('.chain-step');
+          if (!btn) return;
+          const idx = parseInt(btn.dataset.chainIndex, 10);
+          if (!isNaN(idx)) {
+            removeFromChainByIndex(idx);
+          }
+        });
+      }
 
       // Drop zone
       const dz = els.dropzone;
@@ -3913,7 +4009,7 @@
       dz.addEventListener('drop', (e) => {
         const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
         if (!f) return;
-        const ok = /(\.|\/)(wav|mp3|aac|m4a|ogg|flac|webm|mp4|mov|m4v)$/i.test(f.name) ||
+        const ok = /(\.|\/)(wav|mp3|aac|m4a|ogg|flac|webm|caf|aiff|aif|mp4|mov|m4v|3gp|3g2)$/i.test(f.name) ||
           (f.type && (f.type.startsWith('audio/') || f.type.startsWith('video/')));
         if (!ok) {
           toast("Couldn't read this file. Try a different format.", 'error');

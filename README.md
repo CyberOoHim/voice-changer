@@ -38,7 +38,7 @@ Browser-native **voice changer** (PWA). Record or upload voice, chain presets, t
   - **Spaces** — cave, cathedral, helium, reverse, …
 - **Chain up to 3 presets** in click order → blended into **Advanced Lab** sliders  
   - Badges **1 / 2 / 3**, chain bar, rolling window (4th unique drop oldest)  
-  - Tap a chained card again to remove that slot
+  - Tap a chained card or any step in the chain bar to remove that slot
 - Full **Advanced Lab**: pitch/formant, speed, crush, filters, reverb/delay, modulation, dynamics
 - **Apply FX** — offline bake into the working buffer (WYSIWYE); resets lab to defaults after bake
 - **Reset FX** — restores **original** record/upload audio + clears FX/chain (not only slider defaults)

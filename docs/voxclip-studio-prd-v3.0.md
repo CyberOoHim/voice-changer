@@ -156,9 +156,9 @@ Each subsection: **what the user sees → what they do → what happens → what
 - File picker:
   ```html
   <input type="file"
-    accept="audio/*,.mp4,.m4a,.m4v,.mov,.webm,video/mp4,video/webm,video/quicktime,video/x-m4v">
+    accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v">
   ```
-  - Explicit `.mp4` and `video/mp4` so mobile pickers (especially iOS/Android) always surface MP4 camera roll clips, not only pure “audio” files.
+  - Explicit extensions (`.mp3,.wav,.m4a,...`) alongside MIME types so iPadOS / iOS Files app surfaces all allowed audio and video files without grayout/muting.
 - Drop zone label: `WAV · MP3 · AAC · M4A · MP4 · MOV · WebM`
 - Dragging over the zone highlights it; unsupported type → same toast as failed upload (not silent).
 - File size: warn (not block) above **500MB**: `Large file — this may take a moment to decode.`
