@@ -8,10 +8,14 @@
   <meta name="description" content="VoxClip Studio — browser voice changer. Record, transform, export. Fully on-device." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="VoxClip" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="msapplication-TileColor" content="#0b0f14" />
+  <meta name="msapplication-TileImage" content="icons/icon-512.png" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
   <title>VoxClip Studio</title>
   <style>
     :root {
@@ -105,9 +109,8 @@
     .brand { display: flex; align-items: center; gap: 10px; }
     .brand-mark {
       width: 36px; height: 36px; border-radius: 10px;
-      background: linear-gradient(135deg, #38bdf8, #22d3ee);
-      display: grid; place-items: center; color: #041018; font-weight: 900; font-size: 14px;
-      box-shadow: 0 0 24px rgba(56,189,248,.35);
+      overflow: hidden; flex-shrink: 0;
+      box-shadow: 0 0 20px rgba(56,189,248,.4);
     }
     .brand h1 { margin: 0; font-size: 1.15rem; letter-spacing: -.02em; }
     .brand p { margin: 0; color: var(--muted); font-size: .78rem; }
@@ -695,7 +698,9 @@
   <div class="app">
     <header class="app-header">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">V</div>
+        <div class="brand-mark" aria-hidden="true">
+          <img src="icons/icon-192.png" alt="" width="36" height="36" style="width:100%;height:100%;border-radius:10px;object-fit:cover;display:block;" />
+        </div>
         <div>
           <h1>VoxClip Studio</h1>
           <p>Voice changer · on-device · PWA</p>
@@ -778,6 +783,7 @@
         <button type="button" id="btnRedo" disabled aria-label="Redo FX change" title="Ctrl+Y">↷ Redo</button>
         <button type="button" id="btnApplyFx" disabled aria-label="Apply FX to clip">Apply FX</button>
         <button type="button" id="btnResetFx" aria-label="Restore original audio and reset FX to defaults" title="Restore original audio + clear FX">Reset FX</button>
+        <button type="button" id="btnResetAudio" disabled aria-label="Reset recorded or uploaded audio" title="Clear/reset current audio recording or upload">Reset Audio</button>
       </div>
     </section>
 
@@ -1308,6 +1314,7 @@
       btnFrameNext: $('btnFrameNext'),
       btnApplyFx: $('btnApplyFx'),
       btnResetFx: $('btnResetFx'),
+      btnResetAudio: $('btnResetAudio'),
       btnUndo: $('btnUndo'),
       btnRedo: $('btnRedo'),
       tabBuiltIn: $('tabBuiltIn'),
@@ -2699,8 +2706,8 @@
     function updateTransportEnabled() {
       const has = !!S.buffer && !S.baking;
       const hasBuf = !!S.buffer;
-      [els.btnPlay, els.btnStop, els.btnLoop, els.btnSkipN10, els.btnSkipN5, els.btnSkipP5, els.btnSkipP10, els.btnMoreSkip, els.btnFramePrev, els.btnFrameNext, els.btnExportWav, els.btnExportMp3].forEach((b) => {
-        b.disabled = !has;
+      [els.btnPlay, els.btnStop, els.btnLoop, els.btnSkipN10, els.btnSkipN5, els.btnSkipP5, els.btnSkipP10, els.btnMoreSkip, els.btnFramePrev, els.btnFrameNext, els.btnExportWav, els.btnExportMp3, els.btnResetAudio].forEach((b) => {
+        if (b) b.disabled = !has;
       });
       // Loop can stay toggleable when has buffer even if baking ends
       els.btnLoop.disabled = !hasBuf || S.baking;
@@ -3636,6 +3643,33 @@
       );
     }
 
+    /**
+     * Reset Audio → clears current recording or uploaded audio clip, playhead, history & video preview.
+     * Preserves FX parameters and custom preset selections so user can record or upload a new audio file with their desired FX intact.
+     */
+    function resetAudio() {
+      if (!S.buffer && !S.originalBuffer) {
+        toast('No audio to reset');
+        return;
+      }
+      stopPlayback(true);
+      if (S.recording) stopRecording();
+      S.buffer = null;
+      S.originalBuffer = null;
+      S.playhead = 0;
+      S.sourceName = '';
+      clearHistory();
+      revokeVideo();
+      els.waveEmpty.classList.remove('hidden');
+      if (els.sourceMeta) els.sourceMeta.textContent = '';
+      updateUndoButtons();
+      updateTransportEnabled();
+      updateTimeChip();
+      drawWave();
+      schedulePersist();
+      toast('Audio reset', 'ok');
+    }
+
     /* =========================================================
        Reset project / clear storage
        ========================================================= */
@@ -3902,6 +3936,7 @@
 
       els.btnApplyFx.addEventListener('click', applyFxBake);
       els.btnResetFx.addEventListener('click', resetFx);
+      els.btnResetAudio.addEventListener('click', resetAudio);
 
       els.tabBuiltIn.addEventListener('click', () => setPresetTab('built-in'));
       els.tabCustom.addEventListener('click', () => setPresetTab('custom'));
