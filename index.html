@@ -1,0 +1,4074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="VoxClip Studio — browser voice changer. Record, transform, export. Fully on-device." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>VoxClip Studio</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --bg2: #121821;
+      --bg3: #1a2330;
+      --border: #243041;
+      --text: #e8eef7;
+      --muted: #8b9bb0;
+      --accent: #38bdf8;
+      --accent2: #22d3ee;
+      --danger: #f43f5e;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --radius: 14px;
+      --shadow: 0 8px 28px rgba(0,0,0,.35);
+      --touch: 44px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: radial-gradient(1200px 600px at 10% -10%, #132033 0%, transparent 55%),
+                  radial-gradient(900px 500px at 100% 0%, #0f2430 0%, transparent 50%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      overscroll-behavior-y: contain;
+    }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg3);
+      color: var(--text);
+      border-radius: 12px;
+      min-height: var(--touch);
+      min-width: var(--touch);
+      padding: 0.55rem 0.9rem;
+      transition: background .15s, border-color .15s, transform .08s, opacity .15s;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    button:hover:not(:disabled) { border-color: #3a516b; background: #223042; }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+      border-color: transparent;
+      color: #041018;
+      font-weight: 700;
+    }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.06); background: linear-gradient(135deg, #0ea5e9, #06b6d4); }
+    .btn-danger {
+      background: rgba(244, 63, 94, .15);
+      border-color: rgba(244, 63, 94, .45);
+      color: #fecdd3;
+    }
+    .btn-ghost { background: transparent; }
+    .btn-rec.recording {
+      background: rgba(244, 63, 94, .2);
+      border-color: var(--danger);
+      color: #fecdd3;
+      animation: pulse 1.1s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244,63,94,.35); }
+      50% { box-shadow: 0 0 0 8px rgba(244,63,94,0); }
+    }
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: max(12px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom));
+    }
+    header.app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-mark {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #38bdf8, #22d3ee);
+      display: grid; place-items: center; color: #041018; font-weight: 900; font-size: 14px;
+      box-shadow: 0 0 24px rgba(56,189,248,.35);
+    }
+    .brand h1 { margin: 0; font-size: 1.15rem; letter-spacing: -.02em; }
+    .brand p { margin: 0; color: var(--muted); font-size: .78rem; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 10px; border-radius: 999px;
+      background: var(--bg2); border: 1px solid var(--border);
+      font-size: .75rem; color: var(--muted);
+    }
+    .pill.online .dot { background: var(--ok); }
+    .pill.offline .dot { background: var(--warn); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+    .card {
+      background: rgba(18, 24, 33, .88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: .72rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .row.spread { justify-content: space-between; }
+    .grow { flex: 1 1 auto; }
+
+    .source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    @media (min-width: 640px) {
+      .source-actions { grid-template-columns: auto auto 1fr; align-items: center; }
+    }
+
+    .dropzone {
+      border: 1.5px dashed #334155;
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(15, 23, 32, .6);
+      transition: border-color .15s, background .15s;
+      min-height: 72px;
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, .08);
+      color: var(--text);
+    }
+    .dropzone.busy { opacity: .7; pointer-events: none; }
+    .dropzone strong { color: var(--text); font-size: .95rem; }
+    .dropzone small { font-size: .78rem; }
+
+    .meter-wrap {
+      display: none;
+      margin-top: 10px;
+      gap: 10px;
+      align-items: center;
+    }
+    .meter-wrap.show { display: flex; }
+    .meter {
+      flex: 1;
+      height: 10px;
+      border-radius: 999px;
+      background: #0f1720;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .meter > i {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22d3ee, #34d399 55%, #fbbf24 82%, #f43f5e);
+      transition: width .06s linear;
+    }
+    .rec-timer {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: #fecdd3;
+      min-width: 3.5rem;
+    }
+    .gain-panel {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 32, .55);
+      display: grid;
+      gap: 12px;
+    }
+    .gain-panel .gain-row {
+      display: grid;
+      gap: 4px;
+    }
+    .gain-panel .gain-row header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+    .gain-panel .gain-row header strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+    .gain-panel .gain-row header .val {
+      color: var(--accent2);
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      min-width: 3.2rem;
+      text-align: right;
+    }
+    .gain-panel .gain-row input[type="range"] {
+      width: 100%;
+      height: 32px;
+      accent-color: var(--accent);
+    }
+    .gain-panel .hint {
+      margin: 0;
+      font-size: .72rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    #videoPreview {
+      display: none;
+      width: 100%;
+      max-height: 160px;
+      border-radius: 12px;
+      background: #000;
+      margin-bottom: 10px;
+      object-fit: contain;
+    }
+    #videoPreview.show { display: block; }
+
+    .wave-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #0a1018;
+      border: 1px solid var(--border);
+      height: 140px;
+      touch-action: none;
+    }
+    @media (min-width: 720px) { .wave-wrap { height: 180px; } }
+    #wave {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: pointer;
+    }
+    .wave-empty {
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      color: var(--muted);
+      pointer-events: none;
+      font-size: .9rem;
+      text-align: center;
+      padding: 12px;
+    }
+    .wave-empty.hidden { display: none; }
+
+    .time-chip {
+      font-variant-numeric: tabular-nums;
+      font-size: .85rem;
+      color: var(--muted);
+      margin: 8px 0;
+    }
+    .time-chip b { color: var(--text); }
+
+    .transport {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .transport .skip-desktop { display: none; }
+    .transport .frame-btns { display: none; }
+    .transport .frame-btns.show { display: inline-flex; gap: 6px; }
+    @media (min-width: 720px) {
+      .transport .skip-desktop { display: inline-flex; gap: 6px; }
+      .transport .skip-mobile-extra { display: none !important; }
+    }
+    .transport button.active-loop {
+      border-color: var(--accent);
+      color: var(--accent2);
+      background: rgba(56,189,248,.1);
+    }
+
+    .tabs {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .tabs button {
+      min-height: 36px;
+      border: none;
+      border-radius: 999px;
+      background: transparent;
+      padding: 0.4rem 0.9rem;
+      font-size: .85rem;
+    }
+    .tabs button.active {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .preset-groups {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    details.preset-expander {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(10, 16, 24, .55);
+      overflow: hidden;
+    }
+    details.preset-expander > summary {
+      list-style: none;
+      cursor: pointer;
+      user-select: none;
+      padding: 10px 12px;
+      font-size: .78rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    details.preset-expander > summary::-webkit-details-marker { display: none; }
+    details.preset-expander > summary::before {
+      content: "▾";
+      color: var(--accent);
+      margin-right: 4px;
+    }
+    details.preset-expander:not([open]) > summary::before { content: "▸"; }
+    details.preset-expander > summary .count {
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      font-size: .75rem;
+    }
+    .preset-expander .preset-grid {
+      margin: 0;
+      padding: 0 10px 10px;
+    }
+    .chain-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px dashed #334155;
+      background: rgba(15, 23, 32, .5);
+      font-size: .85rem;
+      color: var(--muted);
+      min-height: 44px;
+    }
+    .chain-bar strong { color: var(--text); }
+    .chain-bar .chain-steps {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    .chain-bar .chain-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, .12);
+      border: 1px solid rgba(56, 189, 248, .35);
+      font-size: .8rem;
+    }
+    .chain-bar .chain-step .ord {
+      display: inline-grid;
+      place-items: center;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #041018;
+      font-size: .68rem;
+      font-weight: 800;
+    }
+    .chain-bar .chain-arrow { color: var(--muted); }
+    .preset-card {
+      text-align: left;
+      padding: 10px 10px 12px;
+      min-height: 88px;
+      border-radius: 12px;
+      background: var(--bg);
+      position: relative;
+    }
+    .preset-card .emoji {
+      font-size: 1.55rem;
+      line-height: 1;
+      display: block;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,.25));
+    }
+    .preset-card .name { font-weight: 700; font-size: .84rem; margin-top: 6px; }
+    .preset-card .desc { font-size: .7rem; color: var(--muted); margin-top: 2px; line-height: 1.25; }
+    .preset-card.active {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(56,189,248,.35);
+    }
+    .preset-card .chain-badge {
+      position: absolute;
+      top: 8px; right: 8px;
+      min-width: 22px; height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: .72rem;
+      font-weight: 800;
+      background: var(--accent);
+      color: #041018;
+    }
+    .preset-card.active-1 { border-color: #38bdf8; box-shadow: inset 0 0 0 1px rgba(56,189,248,.35); }
+    .preset-card.active-2 { border-color: #a78bfa; box-shadow: inset 0 0 0 1px rgba(167,139,250,.4); }
+    .preset-card.active-3 { border-color: #34d399; box-shadow: inset 0 0 0 1px rgba(52,211,153,.4); }
+    .preset-card.active-1 .chain-badge { background: #38bdf8; color: #041018; }
+    .preset-card.active-2 .chain-badge { background: #a78bfa; color: #041018; }
+    .preset-card.active-3 .chain-badge { background: #34d399; color: #041018; }
+    .chain-bar .chain-step.step-1 { border-color: rgba(56,189,248,.45); background: rgba(56,189,248,.12); }
+    .chain-bar .chain-step.step-2 { border-color: rgba(167,139,250,.45); background: rgba(167,139,250,.12); }
+    .chain-bar .chain-step.step-2 .ord { background: #a78bfa; }
+    .chain-bar .chain-step.step-3 { border-color: rgba(52,211,153,.45); background: rgba(52,211,153,.12); }
+    .chain-bar .chain-step.step-3 .ord { background: #34d399; }
+    .preset-card.custom-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .preset-card .mini-row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .preset-card .mini-row button {
+      min-height: 32px;
+      min-width: 0;
+      padding: 0.25rem 0.45rem;
+      font-size: .72rem;
+    }
+    .empty-customs {
+      color: var(--muted);
+      font-size: .9rem;
+      padding: 12px 4px;
+    }
+
+    details.lab {
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+      padding-top: 8px;
+    }
+    details.lab > summary {
+      cursor: pointer;
+      list-style: none;
+      font-weight: 700;
+      color: var(--text);
+      padding: 8px 0;
+      user-select: none;
+    }
+    details.lab > summary::-webkit-details-marker { display: none; }
+    details.lab > summary::before {
+      content: "▸ ";
+      color: var(--accent);
+    }
+    details.lab[open] > summary::before { content: "▾ "; }
+
+    .fx-group { margin: 12px 0 16px; }
+    .fx-group h3 {
+      margin: 0 0 8px;
+      font-size: .78rem;
+      color: var(--accent2);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .fx-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .fx-row label {
+      font-size: .82rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      grid-column: 1 / -1;
+    }
+    .fx-row label span.val {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      min-width: 3.2rem;
+      text-align: right;
+    }
+    .fx-row input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      accent-color: var(--accent);
+      height: 28px;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .switch {
+      position: relative;
+      width: 48px; height: 28px;
+      flex: 0 0 auto;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .switch span {
+      position: absolute; inset: 0;
+      background: #243041;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      transition: .15s;
+    }
+    .switch span::after {
+      content: "";
+      position: absolute;
+      width: 20px; height: 20px;
+      left: 3px; top: 3px;
+      background: #cbd5e1;
+      border-radius: 50%;
+      transition: .15s;
+    }
+    .switch input:checked + span { background: rgba(56,189,248,.35); border-color: var(--accent); }
+    .switch input:checked + span::after { transform: translateX(20px); background: var(--accent2); }
+    .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .export-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .footer-note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .78rem;
+      text-align: center;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    .modal-backdrop.show { display: flex; }
+    @media (min-width: 640px) {
+      .modal-backdrop { align-items: center; }
+    }
+    .modal {
+      width: min(440px, 100%);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      max-height: min(90vh, 720px);
+      overflow: auto;
+    }
+    .modal h3 { margin: 0 0 8px; font-size: 1.05rem; }
+    .modal p { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+    .modal label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+    .modal input[type="text"], .modal select {
+      width: 100%;
+      min-height: var(--touch);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      padding: 0 12px;
+      margin-bottom: 12px;
+    }
+    .modal-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+    /* Toasts */
+    #toasts {
+      position: fixed;
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: min(420px, calc(100% - 24px));
+      pointer-events: none;
+    }
+    .toast {
+      background: #15202b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      font-size: .9rem;
+      animation: toastIn .2s ease;
+    }
+    .toast.error { border-color: rgba(244,63,94,.5); }
+    .toast.ok { border-color: rgba(52,211,153,.45); }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); border: 0;
+    }
+    .settings-list { display: grid; gap: 12px; }
+    .settings-list .field label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+    .settings-list select {
+      width: 100%; min-height: var(--touch);
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--bg); padding: 0 12px;
+    }
+    .busy-overlay {
+      position: absolute; inset: 0;
+      background: rgba(11,15,20,.55);
+      display: none;
+      place-items: center;
+      color: var(--text);
+      font-weight: 600;
+      z-index: 5;
+      border-radius: 12px;
+    }
+    .busy-overlay.show { display: grid; }
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid #334155;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">V</div>
+        <div>
+          <h1>VoxClip Studio</h1>
+          <p>Voice changer · on-device · PWA</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span id="netPill" class="pill online" role="status" aria-live="polite">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="netPillText">Online</span>
+        </span>
+        <button type="button" id="btnSettings" class="btn-ghost" aria-label="Settings">⚙</button>
+      </div>
+    </header>
+
+    <!-- SOURCE -->
+    <section class="card" aria-labelledby="srcTitle">
+      <h2 id="srcTitle">Source</h2>
+      <div class="source-actions">
+        <button type="button" id="btnRecord" class="btn-primary btn-rec" aria-label="Record from microphone">● Record</button>
+        <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
+        <input type="file" id="fileInput" class="sr-only" accept="audio/*,.mp4,.m4a,.m4v,.mov,.webm,video/mp4,video/webm,video/quicktime,video/x-m4v" />
+      </div>
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio or video files here">
+        <strong>Drop audio or video</strong>
+        <small>WAV · MP3 · AAC · M4A · MP4 · MOV · WebM</small>
+      </div>
+      <div id="meterWrap" class="meter-wrap" aria-hidden="true">
+        <div class="meter" aria-hidden="true"><i id="meterBar"></i></div>
+        <span id="recTimer" class="rec-timer">0:00</span>
+      </div>
+      <div class="gain-panel" aria-label="Recording and input levels">
+        <div class="gain-row">
+          <header>
+            <strong>Mic level</strong>
+            <span id="micLevelVal" class="val">1.0×</span>
+          </header>
+          <input type="range" id="micLevel" min="1" max="12" step="0.1" value="3" aria-label="Microphone recording level" />
+          <p class="hint">Boost applied while recording (and again after stop). Raise this on quiet iPad/iPhone mics.</p>
+        </div>
+        <div class="gain-row">
+          <header>
+            <strong>Input gain</strong>
+            <span id="inputGainVal" class="val">1.0×</span>
+          </header>
+          <input type="range" id="inputGain" min="0.5" max="9" step="0.1" value="1" aria-label="Input gain before FX gain" />
+          <p class="hint">Playback/export make-up gain — always applied <em>before</em> the Advanced Lab “Gain” slider (cascaded: input × FX gain).</p>
+        </div>
+      </div>
+      <p id="sourceMeta" class="footer-note" style="text-align:left;margin-top:10px;margin-bottom:0"></p>
+    </section>
+
+    <!-- WAVE / TRANSPORT -->
+    <section class="card" aria-labelledby="waveTitle">
+      <h2 id="waveTitle">Preview</h2>
+      <video id="videoPreview" muted playsinline webkit-playsinline preload="metadata"></video>
+      <div class="wave-wrap" id="waveWrap">
+        <canvas id="wave" aria-label="Waveform — click or tap to seek"></canvas>
+        <div id="waveEmpty" class="wave-empty">Pick a voice character, then record or upload</div>
+        <div id="bakeOverlay" class="busy-overlay" role="status"><span><span class="spinner"></span>Applying FX…</span></div>
+      </div>
+      <div class="time-chip" id="timeChip"><b>0:00.00</b> / 0:00.00</div>
+      <div class="transport" role="toolbar" aria-label="Transport">
+        <span class="skip-desktop">
+          <button type="button" id="btnSkipN10" disabled aria-label="Skip back 10 seconds" title="Shift+←">−10</button>
+        </span>
+        <button type="button" id="btnSkipN5" disabled aria-label="Skip back 5 seconds" title="←">−5</button>
+        <button type="button" id="btnPlay" class="btn-primary" disabled aria-label="Play" title="Space">▶ Play</button>
+        <button type="button" id="btnSkipP5" disabled aria-label="Skip forward 5 seconds" title="→">+5</button>
+        <span class="skip-desktop">
+          <button type="button" id="btnSkipP10" disabled aria-label="Skip forward 10 seconds" title="Shift+→">+10</button>
+        </span>
+        <button type="button" id="btnMoreSkip" class="skip-mobile-extra" disabled aria-label="More skip options" aria-haspopup="true">⋯</button>
+        <span id="frameBtns" class="frame-btns">
+          <button type="button" id="btnFramePrev" disabled aria-label="Previous frame" title=",">◀ Frame</button>
+          <button type="button" id="btnFrameNext" disabled aria-label="Next frame" title=".">Frame ▶</button>
+        </span>
+        <button type="button" id="btnStop" disabled aria-label="Stop">⏹</button>
+        <button type="button" id="btnLoop" disabled aria-label="Loop" aria-pressed="false">Loop</button>
+        <button type="button" id="btnUndo" disabled aria-label="Undo FX change" title="Ctrl+Z">↶ Undo</button>
+        <button type="button" id="btnRedo" disabled aria-label="Redo FX change" title="Ctrl+Y">↷ Redo</button>
+        <button type="button" id="btnApplyFx" disabled aria-label="Apply FX to clip">Apply FX</button>
+        <button type="button" id="btnResetFx" aria-label="Restore original audio and reset FX to defaults" title="Restore original audio + clear FX">Reset FX</button>
+      </div>
+    </section>
+
+    <!-- PRESETS -->
+    <section class="card" aria-labelledby="presetTitle">
+      <div class="row spread" style="margin-bottom:4px">
+        <h2 id="presetTitle" style="margin:0">Voice presets</h2>
+        <div class="tabs" role="tablist" aria-label="Preset library">
+          <button type="button" id="tabBuiltIn" class="active" role="tab" aria-selected="true">Built-in</button>
+          <button type="button" id="tabCustom" role="tab" aria-selected="false">My settings</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button type="button" id="btnSaveSettings" class="btn-primary" aria-label="Save current FX as custom setting">💾 Save settings</button>
+        <button type="button" id="btnClearChain" class="btn-ghost" aria-label="Clear preset chain">Clear chain</button>
+      </div>
+      <div id="chainBar" class="chain-bar" aria-live="polite">
+        <strong>Chain</strong>
+        <span id="chainLabel">Tap up to 3 presets in order — they combine into Advanced Lab sliders.</span>
+      </div>
+      <div id="presetGrid" class="preset-groups" role="list"></div>
+      <div id="customEmpty" class="empty-customs" hidden>
+        No saved settings yet. Tweak the FX Lab, then tap <strong>Save settings</strong>.
+      </div>
+    </section>
+
+    <!-- ADVANCED LAB -->
+    <section class="card" aria-labelledby="labTitle">
+      <h2 id="labTitle">Advanced Lab</h2>
+      <details id="labDetails" class="lab">
+        <summary>Show FX parameters</summary>
+        <div id="fxPanel"></div>
+      </details>
+    </section>
+
+    <!-- EXPORT -->
+    <section class="card" aria-labelledby="exportTitle">
+      <h2 id="exportTitle">Export</h2>
+      <div class="export-row">
+        <button type="button" id="btnExportWav" class="btn-primary" disabled aria-label="Export WAV">Export WAV</button>
+        <button type="button" id="btnExportMp3" disabled aria-label="Export MP3">Export MP3</button>
+        <button type="button" id="btnResetProject" class="btn-danger" aria-label="Reset project">Reset Project</button>
+      </div>
+      <p class="footer-note">All processing stays on your device. Audio is never uploaded.</p>
+    </section>
+  </div>
+
+  <div id="toasts" aria-live="polite" aria-relevant="additions"></div>
+
+  <!-- Save modal -->
+  <div id="saveModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="saveModalTitle" hidden>
+    <div class="modal">
+      <h3 id="saveModalTitle">Save voice settings</h3>
+      <p>Store the current FX as a named preset on this device.</p>
+      <label for="saveName">Name</label>
+      <input type="text" id="saveName" maxlength="40" placeholder="e.g. Streamer Villain" autocomplete="off" />
+      <div class="modal-actions">
+        <button type="button" id="saveCancel">Cancel</button>
+        <button type="button" id="saveOverwrite" class="btn-danger" hidden>Overwrite</button>
+        <button type="button" id="saveConfirm" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+    <div class="modal">
+      <h3 id="settingsTitle">Settings</h3>
+      <div class="settings-list">
+        <div class="field">
+          <label for="skipInterval">Skip interval (secondary)</label>
+          <select id="skipInterval">
+            <option value="1">1 s</option>
+            <option value="3">3 s</option>
+            <option value="5" selected>5 s</option>
+            <option value="10">10 s</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="exportPref">Default export format</label>
+          <select id="exportPref">
+            <option value="wav">WAV</option>
+            <option value="mp3">MP3</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="fxSourceMode">Built-in FX Presets Source</label>
+          <select id="fxSourceMode">
+            <option value="local">Local file (./fx-presets.json)</option>
+            <option value="github">GitHub Pages / Remote URL</option>
+          </select>
+        </div>
+        <div class="field" id="fxRemoteUrlGroup" hidden>
+          <label for="fxRemoteUrl">GitHub Pages / Remote URL</label>
+          <input type="text" id="fxRemoteUrl" placeholder="https://<user>.github.io/<repo>/fx-presets.json" autocomplete="off" />
+        </div>
+        <div class="row">
+          <button type="button" id="btnReloadFx">Reload FX Presets</button>
+        </div>
+        <div class="row">
+          <button type="button" id="btnExportCustoms">Export custom settings JSON</button>
+          <button type="button" id="btnImportCustoms">Import custom settings</button>
+          <input type="file" id="importCustomsInput" class="sr-only" accept="application/json,.json" />
+        </div>
+        <button type="button" id="btnClearSaved" class="btn-danger">Clear all saved data</button>
+        <p class="footer-note" style="text-align:left">
+          VoxClip Studio v3 · Privacy: FX values and custom names live in localStorage only. No audio samples are stored.
+        </p>
+      </div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button type="button" id="settingsClose" class="btn-primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- More skip sheet (mobile) -->
+  <div id="moreSkipModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="moreSkipTitle" hidden>
+    <div class="modal">
+      <h3 id="moreSkipTitle">Skip</h3>
+      <div class="row">
+        <button type="button" id="btnSkipN10m">−10 s</button>
+        <button type="button" id="btnSkipP10m">+10 s</button>
+      </div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button type="button" id="moreSkipClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    /* =========================================================
+       Constants & defaults
+       ========================================================= */
+    /**
+     * localStorage key: "voxclip.studio.v3"
+     * Shape (PersistedState):
+     * {
+     *   version: 3,
+     *   ui: {
+     *     loop, skipIntervalSec, lastExportFormat, advancedLabExpanded,
+     *     presetsSection: 'built-in'|'custom',
+     *     micLevel, inputGain,
+     *     presetCatOpen: { Ages, Characters, Creatures, Devices, Spaces: boolean }
+     *   },
+     *   fx: full FX param object (last Advanced Lab values),
+     *   presetChain: string[]  // up to 3 built-in preset ids, click order
+     *   activePresetId: string|null  // legacy mirror of last chain id
+     *   activeCustomId: string|null,
+     *   customSettings: [{ id, name, fx, createdAt, updatedAt, emoji? }],
+     *   updatedAt: number
+     * }
+     * NOT stored: audio buffers, undo/redo stacks, playhead, video blobs.
+     * Backup on corrupt parse: "voxclip.studio.v3.bak"
+     */
+    const STORAGE_KEY = 'voxclip.studio.v3';
+    const MAX_CUSTOMS = 50;
+    // iPad/Safari mics are often extremely quiet — allow large auto boost
+    const TARGET_PEAK = 0.95;
+    const MAX_NORM_GAIN = 32;
+    const SKIP_NORM_PEAK = 0.90;
+    const LIMITER_PEAK = 0.89;
+    const LARGE_FILE_BYTES = 500 * 1024 * 1024;
+
+    function isQuietMicDevice() {
+      const ua = navigator.userAgent || '';
+      const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const safari = /^((?!chrome|android).)*safari/i.test(ua);
+      return iOS || (safari && /Macintosh/.test(ua));
+    }
+
+    function defaultMicLevel() { return isQuietMicDevice() ? 4 : 2; }
+    function defaultInputGain() { return isQuietMicDevice() ? 2.5 : 1; }
+
+    let DEFAULT_FX_VALUES = {
+      pitchSemi: 0,
+      formant: 0,
+      reverse: false,
+      speed: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+      sampleRateCrush: 0,
+      bitcrush: 0,
+      bpFreq: 1200,
+      bpQ: 1,
+      bpMix: 0,
+      lowpass: 18000,
+      highpass: 40,
+      bass: 0,
+      mid: 0,
+      treble: 0,
+      distortion: 0,
+      ringFreq: 0,
+      noiseMix: 0,
+      reverbMix: 0,
+      reverbSize: 0.45,
+      reverbDecay: 1.4,
+      delayTime: 0,
+      delayFeedback: 0.25,
+      delayMix: 0,
+      chorus: 0,
+      flanger: 0,
+      tremolo: 0,
+      tremoloRate: 5,
+      vibrato: 0,
+      vibratoRate: 5,
+      gain: 1,
+      compressorThresh: -18,
+      compressorRatio: 3
+    };
+
+    const defaultFx = () => ({ ...DEFAULT_FX_VALUES });
+
+    let FX_META = [
+      { group: 'Pitch & Formant', params: [
+        { key: 'pitchSemi', label: 'Pitch', min: -12, max: 12, step: 0.1, unit: 'st' },
+        { key: 'formant', label: 'Formant', min: -12, max: 12, step: 0.1, unit: 'st' },
+        { key: 'reverse', label: 'Reverse', type: 'bool' }
+      ]},
+      { group: 'Time & Speed', params: [
+        { key: 'speed', label: 'Speed', min: 0.5, max: 2, step: 0.01, unit: '×' },
+        { key: 'fadeIn', label: 'Fade in', min: 0, max: 2, step: 0.01, unit: 's' },
+        { key: 'fadeOut', label: 'Fade out', min: 0, max: 2, step: 0.01, unit: 's' },
+        { key: 'sampleRateCrush', label: 'Sample crush', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'bitcrush', label: 'Bitcrush', min: 0, max: 1, step: 0.01, unit: '' }
+      ]},
+      { group: 'Filters', params: [
+        { key: 'bpFreq', label: 'Bandpass freq', min: 100, max: 8000, step: 1, unit: 'Hz' },
+        { key: 'bpQ', label: 'Bandpass Q', min: 0.2, max: 12, step: 0.1, unit: '' },
+        { key: 'bpMix', label: 'Bandpass mix', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'lowpass', label: 'Lowpass', min: 200, max: 18000, step: 1, unit: 'Hz' },
+        { key: 'highpass', label: 'Highpass', min: 20, max: 4000, step: 1, unit: 'Hz' },
+        { key: 'bass', label: 'Bass', min: -12, max: 12, step: 0.1, unit: 'dB' },
+        { key: 'mid', label: 'Mid', min: -12, max: 12, step: 0.1, unit: 'dB' },
+        { key: 'treble', label: 'Treble', min: -12, max: 12, step: 0.1, unit: 'dB' },
+        { key: 'distortion', label: 'Distortion', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'ringFreq', label: 'Ring mod', min: 0, max: 80, step: 0.5, unit: 'Hz' },
+        { key: 'noiseMix', label: 'Noise mix', min: 0, max: 0.4, step: 0.01, unit: '' }
+      ]},
+      { group: 'Space', params: [
+        { key: 'reverbMix', label: 'Reverb mix', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'reverbSize', label: 'Reverb size', min: 0.1, max: 1, step: 0.01, unit: '' },
+        { key: 'reverbDecay', label: 'Reverb decay', min: 0.2, max: 4, step: 0.05, unit: 's' },
+        { key: 'delayTime', label: 'Delay time', min: 0, max: 1, step: 0.01, unit: 's' },
+        { key: 'delayFeedback', label: 'Delay feedback', min: 0, max: 0.9, step: 0.01, unit: '' },
+        { key: 'delayMix', label: 'Delay mix', min: 0, max: 1, step: 0.01, unit: '' }
+      ]},
+      { group: 'Modulation', params: [
+        { key: 'chorus', label: 'Chorus', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'flanger', label: 'Flanger', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'tremolo', label: 'Tremolo', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'tremoloRate', label: 'Tremolo rate', min: 0.5, max: 20, step: 0.1, unit: 'Hz' },
+        { key: 'vibrato', label: 'Vibrato', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'vibratoRate', label: 'Vibrato rate', min: 0.5, max: 12, step: 0.1, unit: 'Hz' }
+      ]},
+      { group: 'Dynamics', params: [
+        // inputGain is mirrored from S.inputGain (not stored in presets) — see rebuildFxPanel
+        { key: 'inputGain', label: 'Input gain (before FX)', min: 0.5, max: 9, step: 0.1, unit: '×', external: 'inputGain' },
+        { key: 'gain', label: 'FX gain', min: 0, max: 3, step: 0.01, unit: '×' },
+        { key: 'compressorThresh', label: 'Comp thresh', min: -60, max: 0, step: 1, unit: 'dB' },
+        { key: 'compressorRatio', label: 'Comp ratio', min: 1, max: 20, step: 0.1, unit: ':1' }
+      ]}
+    ];
+
+    /** Built-in voice presets — category used only for UI grouping */
+    let BUILTIN_PRESETS = [
+      // —— Ages ——
+      { id: 'baby', cat: 'Ages', name: 'Baby', emoji: '👶', desc: 'Tiny high voice', fx: { pitchSemi: 10, formant: 8, speed: 0.95, treble: 4, highpass: 180, gain: 1.05 } },
+      { id: 'toddler', cat: 'Ages', name: 'Toddler', emoji: '🍼', desc: 'Cute & soft', fx: { pitchSemi: 8, formant: 6, speed: 0.98, treble: 3, highpass: 120, vibrato: 0.12, vibratoRate: 4.5 } },
+      { id: 'kid', cat: 'Ages', name: 'Kid', emoji: '🧒', desc: 'Playful child', fx: { pitchSemi: 6, formant: 5, speed: 1.05, treble: 2.5, mid: 1 } },
+      { id: 'tween', cat: 'Ages', name: 'Tween', emoji: '🎒', desc: 'Young teen energy', fx: { pitchSemi: 3.5, formant: 2.5, speed: 1.06, treble: 1.5 } },
+      { id: 'teen-boy', cat: 'Ages', name: 'Teen Boy', emoji: '👦', desc: 'Cracking mid voice', fx: { pitchSemi: 1.5, formant: 0.5, mid: 2, tremolo: 0.08, tremoloRate: 3.5, highpass: 70 } },
+      { id: 'teen-girl', cat: 'Ages', name: 'Teen Girl', emoji: '👧', desc: 'Bright teen tone', fx: { pitchSemi: 4, formant: 3.5, treble: 2.5, mid: 1.5, speed: 1.04 } },
+      { id: 'young-man', cat: 'Ages', name: 'Young Man', emoji: '🧑', desc: 'Clear adult male', fx: { pitchSemi: -1.5, formant: -1, bass: 1.5, mid: 0.5, highpass: 60 } },
+      { id: 'young-woman', cat: 'Ages', name: 'Young Woman', emoji: '👩', desc: 'Clear adult female', fx: { pitchSemi: 3, formant: 2.5, treble: 1.5, highpass: 90, gain: 1.05 } },
+      { id: 'adult-deep', cat: 'Ages', name: 'Adult Deep', emoji: '🧔', desc: 'Warm mature male', fx: { pitchSemi: -4, formant: -2.5, bass: 3.5, lowpass: 10000, gain: 1.05 } },
+      { id: 'adult-bright', cat: 'Ages', name: 'Adult Bright', emoji: '👱‍♀️', desc: 'Warm mature female', fx: { pitchSemi: 2.2, formant: 1.8, treble: 1.2, mid: 1, highpass: 80 } },
+      { id: 'middle-age', cat: 'Ages', name: 'Middle Age', emoji: '👨‍💼', desc: 'Settled midrange', fx: { pitchSemi: -2, formant: -1, bass: 2, mid: 1.5, compressorThresh: -18, compressorRatio: 3 } },
+      { id: 'elder', cat: 'Ages', name: 'Elder', emoji: '🧓', desc: 'Gentle aged tone', fx: { pitchSemi: -2.5, formant: -1.5, speed: 0.92, lowpass: 7500, vibrato: 0.18, vibratoRate: 3.2, reverbMix: 0.08 } },
+      { id: 'grandma', cat: 'Ages', name: 'Grandma', emoji: '👵', desc: 'Soft older lady', fx: { pitchSemi: 1.5, formant: 1, speed: 0.9, lowpass: 7000, vibrato: 0.14, vibratoRate: 2.8, treble: -1 } },
+      { id: 'grandpa', cat: 'Ages', name: 'Grandpa', emoji: '👴', desc: 'Slow gravelly elder', fx: { pitchSemi: -5, formant: -3, speed: 0.88, bass: 3, lowpass: 6500, distortion: 0.06 } },
+
+      // —— Characters ——
+      { id: 'deep', cat: 'Characters', name: 'Deep', emoji: '🎙️', desc: 'Lower pitch, warm body', fx: { pitchSemi: -5, formant: -2, bass: 4, lowpass: 9000, gain: 1.05 } },
+      { id: 'chipmunk', cat: 'Characters', name: 'Chipmunk', emoji: '🐿️', desc: 'High & playful', fx: { pitchSemi: 7, formant: 4, speed: 1.05, treble: 3 } },
+      { id: 'villain', cat: 'Characters', name: 'Villain', emoji: '😈', desc: 'Dark villain', fx: { pitchSemi: -4, formant: -3, reverbMix: 0.28, reverbDecay: 2.2, delayMix: 0.12, delayTime: 0.18, lowpass: 7000, bass: 3 } },
+      { id: 'hero', cat: 'Characters', name: 'Hero', emoji: '🦸', desc: 'Bold cinematic lead', fx: { pitchSemi: -2, formant: -1, bass: 2.5, mid: 2, compressorThresh: -16, compressorRatio: 4, gain: 1.15, reverbMix: 0.12 } },
+      { id: 'heroine', cat: 'Characters', name: 'Heroine', emoji: '🦸‍♀️', desc: 'Bright confident lead', fx: { pitchSemi: 2, formant: 1.5, treble: 2, mid: 1.5, compressorThresh: -17, compressorRatio: 3.5, gain: 1.1 } },
+      { id: 'narrator', cat: 'Characters', name: 'Narrator', emoji: '📖', desc: 'Documentary warm', fx: { pitchSemi: -2.5, formant: -1.2, bass: 2, mid: 1, lowpass: 11000, compressorThresh: -18, compressorRatio: 2.5, gain: 1.08 } },
+      { id: 'news-anchor', cat: 'Characters', name: 'News Anchor', emoji: '📰', desc: 'Clear broadcast', fx: { highpass: 90, lowpass: 9000, mid: 2, compressorThresh: -20, compressorRatio: 5, gain: 1.12, treble: 1 } },
+      { id: 'storyteller', cat: 'Characters', name: 'Storyteller', emoji: '🧙‍♂️', desc: 'Intimate campfire', fx: { pitchSemi: -1.5, reverbMix: 0.22, reverbDecay: 1.8, bass: 1.5, lowpass: 9000, gain: 0.98 } },
+      { id: 'witch', cat: 'Characters', name: 'Witch', emoji: '🧙‍♀️', desc: 'Creaky mystic', fx: { pitchSemi: 2, formant: -2, speed: 0.94, reverbMix: 0.3, reverbDecay: 2.4, tremolo: 0.12, tremoloRate: 4, lowpass: 8000 } },
+      { id: 'pirate', cat: 'Characters', name: 'Pirate', emoji: '🏴‍☠️', desc: 'Rough sea dog', fx: { pitchSemi: -3.5, formant: -2, distortion: 0.2, bass: 3, highpass: 80, lowpass: 7000, mid: 1.5 } },
+      { id: 'cowboy', cat: 'Characters', name: 'Cowboy', emoji: '🤠', desc: 'Dusty drawl', fx: { pitchSemi: -2, formant: -1.5, speed: 0.9, highpass: 100, lowpass: 6500, bass: 1.5, reverbMix: 0.1 } },
+      { id: 'opera', cat: 'Characters', name: 'Opera', emoji: '🎭', desc: 'Hall reverb drama', fx: { pitchSemi: 1, vibrato: 0.35, vibratoRate: 5.5, reverbMix: 0.5, reverbSize: 0.85, reverbDecay: 2.8, gain: 1.1 } },
+      { id: 'whisper-soft', cat: 'Characters', name: 'Whisper', emoji: '🤫', desc: 'Close soft speech', fx: { highpass: 200, lowpass: 5500, noiseMix: 0.06, gain: 0.85, treble: 2, compressorThresh: -28, compressorRatio: 2 } },
+      { id: 'giant', cat: 'Characters', name: 'Giant', emoji: '🗿', desc: 'Huge slow boom', fx: { pitchSemi: -8, formant: -5, speed: 0.8, bass: 6, lowpass: 5500, reverbMix: 0.25, reverbDecay: 2.5 } },
+      { id: 'elf', cat: 'Characters', name: 'Elf', emoji: '🧝', desc: 'Airy high fantasy', fx: { pitchSemi: 4, formant: 3, treble: 3, chorus: 0.35, reverbMix: 0.2, reverbDecay: 1.6, highpass: 120 } },
+      { id: 'dwarf', cat: 'Characters', name: 'Dwarf', emoji: '⛏️', desc: 'Stout low grit', fx: { pitchSemi: -4.5, formant: -3, bass: 4, distortion: 0.15, mid: 2, lowpass: 7000 } },
+      { id: 'fairy', cat: 'Characters', name: 'Fairy', emoji: '🧚', desc: 'Tiny sparkle voice', fx: { pitchSemi: 9, formant: 7, speed: 1.08, treble: 4, chorus: 0.4, delayMix: 0.1, delayTime: 0.08, highpass: 200 } },
+      { id: 'zombie', cat: 'Characters', name: 'Zombie', emoji: '🧟', desc: 'Slow dead drone', fx: { pitchSemi: -6, formant: -4, speed: 0.78, lowpass: 4000, distortion: 0.18, noiseMix: 0.05, reverbMix: 0.15 } },
+      { id: 'vampire', cat: 'Characters', name: 'Vampire', emoji: '🧛', desc: 'Silken menace', fx: { pitchSemi: -3, formant: -2, reverbMix: 0.2, reverbDecay: 2, lowpass: 8000, bass: 2, delayMix: 0.08, delayTime: 0.12 } },
+      { id: 'ghost', cat: 'Characters', name: 'Ghost', emoji: '👻', desc: 'Breathy & distant', fx: { highpass: 500, reverbMix: 0.45, reverbDecay: 2.5, noiseMix: 0.08, lowpass: 6000, gain: 0.9 } },
+      { id: 'demon', cat: 'Characters', name: 'Demon', emoji: '👿', desc: 'Infernal low growl', fx: { pitchSemi: -7, formant: -5, distortion: 0.35, bass: 5, lowpass: 5000, reverbMix: 0.3, reverbDecay: 2.8, ringFreq: 8 } },
+      { id: 'angel', cat: 'Characters', name: 'Angel', emoji: '😇', desc: 'Airy choir halo', fx: { pitchSemi: 2, formant: 2, chorus: 0.65, reverbMix: 0.4, reverbSize: 0.8, reverbDecay: 2.6, treble: 2, highpass: 100 } },
+      { id: 'clown', cat: 'Characters', name: 'Clown', emoji: '🤡', desc: 'Silly cartoon pitch', fx: { pitchSemi: 5, formant: 4, speed: 1.12, vibrato: 0.4, vibratoRate: 7, treble: 3 } },
+      { id: 'mime-mute', cat: 'Characters', name: 'Muffled', emoji: '🤐', desc: 'Behind a wall', fx: { lowpass: 1200, highpass: 150, reverbMix: 0.15, gain: 0.9 } },
+
+      // —— Creatures ——
+      { id: 'alien', cat: 'Creatures', name: 'Alien', emoji: '👽', desc: 'Odd formants', fx: { pitchSemi: 3, formant: 8, ringFreq: 12, chorus: 0.4, flanger: 0.2 } },
+      { id: 'robot', cat: 'Creatures', name: 'Robot', emoji: '🤖', desc: 'Ring + bitcrush', fx: { ringFreq: 28, bitcrush: 0.45, sampleRateCrush: 0.35, distortion: 0.12, tremolo: 0.25, tremoloRate: 8 } },
+      { id: 'cyborg', cat: 'Creatures', name: 'Cyborg', emoji: '🦾', desc: 'Half-human machine', fx: { pitchSemi: -1, ringFreq: 18, bitcrush: 0.2, sampleRateCrush: 0.15, chorus: 0.2, mid: 1.5 } },
+      { id: 'android', cat: 'Creatures', name: 'Android', emoji: '🛰️', desc: 'Clean synthetic', fx: { pitchSemi: 0.5, formant: -3, bitcrush: 0.12, highpass: 120, lowpass: 9000, tremolo: 0.1, tremoloRate: 6 } },
+      { id: 'monster', cat: 'Creatures', name: 'Monster', emoji: '👹', desc: 'Big scary rumble', fx: { pitchSemi: -9, formant: -6, bass: 6, distortion: 0.4, lowpass: 4500, reverbMix: 0.2 } },
+      { id: 'dragon', cat: 'Creatures', name: 'Dragon', emoji: '🐉', desc: 'Roaring beast', fx: { pitchSemi: -6, formant: -4, distortion: 0.45, bass: 5, reverbMix: 0.35, reverbDecay: 2.2, lowpass: 6000 } },
+      { id: 'goblin', cat: 'Creatures', name: 'Goblin', emoji: '👺', desc: 'Nasal mischief', fx: { pitchSemi: 5, formant: -3, bpMix: 0.55, bpFreq: 1600, bpQ: 2.5, speed: 1.1, distortion: 0.1 } },
+      { id: 'orc', cat: 'Creatures', name: 'Orc', emoji: '🗡️', desc: 'Guttural war cry', fx: { pitchSemi: -5, formant: -4, distortion: 0.3, bass: 4, mid: 2, lowpass: 5500 } },
+      { id: 'squirrel', cat: 'Creatures', name: 'Squirrel', emoji: '🐹', desc: 'Tiny chatter', fx: { pitchSemi: 11, formant: 9, speed: 1.2, treble: 5, highpass: 250 } },
+      { id: 'cat', cat: 'Creatures', name: 'Cat', emoji: '🐱', desc: 'Soft meow-ish', fx: { pitchSemi: 5, formant: 4, vibrato: 0.25, vibratoRate: 6, treble: 2, highpass: 150 } },
+      { id: 'dog', cat: 'Creatures', name: 'Dog', emoji: '🐶', desc: 'Friendly bark tone', fx: { pitchSemi: 2, formant: -1, mid: 3, distortion: 0.08, highpass: 100 } },
+      { id: 'bird', cat: 'Creatures', name: 'Bird', emoji: '🐦', desc: 'Chirpy high', fx: { pitchSemi: 10, formant: 8, speed: 1.15, treble: 5, vibrato: 0.3, vibratoRate: 9, highpass: 300 } },
+      { id: 'frog', cat: 'Creatures', name: 'Frog', emoji: '🐸', desc: 'Gulpy croak', fx: { pitchSemi: -3, formant: 4, ringFreq: 6, lowpass: 3500, bass: 3, speed: 0.95 } },
+      { id: 'bee', cat: 'Creatures', name: 'Bee', emoji: '🐝', desc: 'Buzzy wings', fx: { pitchSemi: 4, ringFreq: 45, tremolo: 0.5, tremoloRate: 18, highpass: 200, treble: 2 } },
+      { id: 'whale', cat: 'Creatures', name: 'Whale', emoji: '🐋', desc: 'Deep ocean song', fx: { pitchSemi: -7, formant: -3, speed: 0.7, reverbMix: 0.55, reverbSize: 0.95, reverbDecay: 3.5, lowpass: 4000, bass: 4 } },
+
+      // —— Devices & media ——
+      { id: 'radio', cat: 'Devices', name: 'Radio', emoji: '📻', desc: 'AM bandpass crunch', fx: { bpMix: 0.85, bpFreq: 1800, bpQ: 2.2, highpass: 300, lowpass: 3400, distortion: 0.18, compressorThresh: -22, compressorRatio: 6, gain: 1.15 } },
+      { id: 'telephone', cat: 'Devices', name: 'Telephone', emoji: '📞', desc: 'Narrow band', fx: { highpass: 400, lowpass: 2800, bpMix: 0.5, bpFreq: 1400, bpQ: 1.4, distortion: 0.1 } },
+      { id: 'megaphone', cat: 'Devices', name: 'Megaphone', emoji: '📢', desc: 'Loud mid push', fx: { mid: 6, highpass: 250, lowpass: 5000, distortion: 0.35, compressorRatio: 8, compressorThresh: -20, gain: 1.2 } },
+      { id: 'walkie', cat: 'Devices', name: 'Walkie-Talkie', emoji: '📟', desc: 'Static radio handset', fx: { highpass: 350, lowpass: 3200, bpMix: 0.4, bpFreq: 1700, distortion: 0.22, noiseMix: 0.05, sampleRateCrush: 0.15, gain: 1.1 } },
+      { id: 'intercom', cat: 'Devices', name: 'Intercom', emoji: '🔔', desc: 'Building speaker', fx: { highpass: 280, lowpass: 4000, mid: 3, distortion: 0.12, compressorRatio: 6, compressorThresh: -20 } },
+      { id: 'pa-system', cat: 'Devices', name: 'PA System', emoji: '🔊', desc: 'Gym hall boom', fx: { mid: 4, highpass: 150, reverbMix: 0.25, reverbDecay: 1.6, compressorRatio: 5, compressorThresh: -18, gain: 1.15 } },
+      { id: 'headphones', cat: 'Devices', name: 'Close Mic', emoji: '🎧', desc: 'Studio proximity', fx: { bass: 2.5, highpass: 50, lowpass: 14000, compressorThresh: -16, compressorRatio: 3, gain: 1.08 } },
+      { id: 'cassette', cat: 'Devices', name: 'Cassette', emoji: '📼', desc: 'Tape wobble', fx: { sampleRateCrush: 0.35, bitcrush: 0.2, highpass: 100, lowpass: 7000, chorus: 0.2, vibrato: 0.12, vibratoRate: 2.5, noiseMix: 0.03 } },
+      { id: 'lofi', cat: 'Devices', name: 'Lo-Fi', emoji: '💽', desc: 'Tape crush', fx: { sampleRateCrush: 0.4, bitcrush: 0.25, highpass: 120, lowpass: 6500, noiseMix: 0.04, chorus: 0.15 } },
+      { id: 'vinyl', cat: 'Devices', name: 'Vinyl', emoji: '💿', desc: 'Warm crackle vibe', fx: { highpass: 60, lowpass: 9000, bass: 1.5, treble: -1, noiseMix: 0.035, chorus: 0.1, sampleRateCrush: 0.08 } },
+      { id: 'tv-old', cat: 'Devices', name: 'Old TV', emoji: '📺', desc: 'CRT speaker box', fx: { highpass: 200, lowpass: 4500, mid: 3, distortion: 0.15, sampleRateCrush: 0.12, noiseMix: 0.02 } },
+      { id: 'smartphone', cat: 'Devices', name: 'Smartphone', emoji: '📱', desc: 'Phone mic thin', fx: { highpass: 180, lowpass: 7500, mid: 2, treble: 1.5, compressorRatio: 4, compressorThresh: -22 } },
+      { id: 'drive-thru', cat: 'Devices', name: 'Drive-Thru', emoji: '🍔', desc: 'Speaker post', fx: { highpass: 300, lowpass: 3800, mid: 4, distortion: 0.28, noiseMix: 0.04, gain: 1.1 } },
+      { id: 'space-radio', cat: 'Devices', name: 'Space Radio', emoji: '📡', desc: 'Distant comms', fx: { highpass: 400, lowpass: 3600, delayMix: 0.2, delayTime: 0.22, delayFeedback: 0.35, reverbMix: 0.25, noiseMix: 0.06, bitcrush: 0.15 } },
+
+      // —— Spaces & FX ——
+      { id: 'cave', cat: 'Spaces', name: 'Cave', emoji: '🕳️', desc: 'Huge space', fx: { reverbMix: 0.55, reverbSize: 0.9, reverbDecay: 3.2, delayMix: 0.15, delayTime: 0.28, delayFeedback: 0.35, lowpass: 8000 } },
+      { id: 'underwater', cat: 'Spaces', name: 'Underwater', emoji: '🌊', desc: 'Muffled depths', fx: { lowpass: 900, reverbMix: 0.35, reverbSize: 0.7, bass: 3, highpass: 60 } },
+      { id: 'cathedral', cat: 'Spaces', name: 'Cathedral', emoji: '⛪', desc: 'Long sacred hall', fx: { reverbMix: 0.6, reverbSize: 0.95, reverbDecay: 3.8, highpass: 80, lowpass: 10000, gain: 0.95 } },
+      { id: 'bathroom', cat: 'Spaces', name: 'Bathroom', emoji: '🚿', desc: 'Tile bounce', fx: { reverbMix: 0.4, reverbSize: 0.35, reverbDecay: 0.9, highpass: 150, treble: 2, mid: 1 } },
+      { id: 'stadium', cat: 'Spaces', name: 'Stadium', emoji: '🏟️', desc: 'Crowd echo', fx: { reverbMix: 0.45, reverbSize: 0.9, reverbDecay: 2.8, delayMix: 0.18, delayTime: 0.35, delayFeedback: 0.25, highpass: 100 } },
+      { id: 'tunnel', cat: 'Spaces', name: 'Tunnel', emoji: '🚇', desc: 'Long tube echo', fx: { reverbMix: 0.35, reverbDecay: 2.2, delayMix: 0.3, delayTime: 0.18, delayFeedback: 0.45, lowpass: 7000 } },
+      { id: 'forest', cat: 'Spaces', name: 'Forest', emoji: '🌲', desc: 'Outdoor airy', fx: { reverbMix: 0.28, reverbSize: 0.7, reverbDecay: 1.8, highpass: 120, treble: 1.5, chorus: 0.1 } },
+      { id: 'slowmo', cat: 'Spaces', name: 'Slow-Mo', emoji: '🐢', desc: 'Half speed vibe', fx: { speed: 0.75, pitchSemi: -2, reverbMix: 0.15 } },
+      { id: 'fasttalk', cat: 'Spaces', name: 'Fast Talk', emoji: '⚡', desc: 'Quick & bright', fx: { speed: 1.25, pitchSemi: 1, treble: 2 } },
+      { id: 'reverse-vibe', cat: 'Spaces', name: 'Reverse', emoji: '↩️', desc: 'Backwards speech', fx: { reverse: true, reverbMix: 0.2, reverbDecay: 1.5 } },
+      { id: 'chorus-vox', cat: 'Spaces', name: 'Chorus Vox', emoji: '🎶', desc: 'Wide doubles', fx: { chorus: 0.7, delayMix: 0.08, delayTime: 0.03, vibrato: 0.15, vibratoRate: 4 } },
+      { id: 'flanger-vox', cat: 'Spaces', name: 'Flanger', emoji: '🌀', desc: 'Jet sweep voice', fx: { flanger: 0.75, chorus: 0.2, highpass: 80 } },
+      { id: 'tremolo-vox', cat: 'Spaces', name: 'Tremolo', emoji: '📳', desc: 'Amplitude pulse', fx: { tremolo: 0.7, tremoloRate: 7, mid: 1 } },
+      { id: 'clean-boost', cat: 'Spaces', name: 'Clean Boost', emoji: '✨', desc: 'Louder & clear', fx: { gain: 1.25, compressorThresh: -16, compressorRatio: 3, highpass: 80, treble: 1.5, bass: 1 } },
+      { id: 'helium', cat: 'Spaces', name: 'Helium', emoji: '🎈', desc: 'Party balloon voice', fx: { pitchSemi: 8, formant: 6, treble: 3, speed: 1.05 } },
+      { id: 'sulfur', cat: 'Spaces', name: 'Sulfur', emoji: '🧪', desc: 'Deep gas joke', fx: { pitchSemi: -8, formant: -6, bass: 5, lowpass: 7000 } }
+    ];
+
+    let PRESET_CATS = ['Ages', 'Characters', 'Creatures', 'Devices', 'Spaces'];
+
+    async function loadFxPresetsData(silent = true) {
+      const mode = S.ui.fxSourceMode || 'local';
+      const remoteUrl = (S.ui.fxRemoteUrl || '').trim();
+      let targetUrl = './fx-presets.json';
+
+      if (mode === 'github' && remoteUrl) {
+        targetUrl = remoteUrl;
+      }
+
+      try {
+        const res = await fetch(targetUrl);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data || !Array.isArray(data.presets)) throw new Error('Invalid JSON structure');
+
+        if (data.categories && Array.isArray(data.categories)) {
+          PRESET_CATS = data.categories;
+        }
+        if (data.defaultFx && typeof data.defaultFx === 'object') {
+          DEFAULT_FX_VALUES = { ...DEFAULT_FX_VALUES, ...data.defaultFx };
+        }
+        if (data.fxMeta && Array.isArray(data.fxMeta)) {
+          FX_META = data.fxMeta;
+        }
+        BUILTIN_PRESETS = data.presets;
+
+        S.ui.presetCatOpen = sanitizeCatOpen(S.ui.presetCatOpen);
+
+        rebuildFxPanel();
+        renderPresets();
+        updateChainBar();
+
+        if (!silent) {
+          toast(`Loaded ${BUILTIN_PRESETS.length} FX presets from ${mode === 'github' ? 'GitHub Pages/Remote' : 'Local file'}`);
+        }
+        return true;
+      } catch (err) {
+        console.warn('FX preset load warning (using fallback):', err);
+        if (mode === 'github' && targetUrl !== './fx-presets.json') {
+          try {
+            const locRes = await fetch('./fx-presets.json');
+            if (locRes.ok) {
+              const locData = await locRes.json();
+              if (locData && Array.isArray(locData.presets)) {
+                if (locData.categories) PRESET_CATS = locData.categories;
+                if (locData.defaultFx) DEFAULT_FX_VALUES = { ...DEFAULT_FX_VALUES, ...locData.defaultFx };
+                if (locData.fxMeta) FX_META = locData.fxMeta;
+                BUILTIN_PRESETS = locData.presets;
+                S.ui.presetCatOpen = sanitizeCatOpen(S.ui.presetCatOpen);
+                rebuildFxPanel();
+                renderPresets();
+                updateChainBar();
+                if (!silent) toast(`Remote failed. Loaded ${BUILTIN_PRESETS.length} presets from local file.`, 'error');
+                return true;
+              }
+            }
+          } catch (_) {}
+        }
+        if (!silent) {
+          toast(`Could not load preset file: ${err.message}. Using embedded fallback.`, 'error');
+        }
+        return false;
+      }
+    }
+
+    /* =========================================================
+       State
+       ========================================================= */
+    const MAX_PRESET_CHAIN = 3;
+    const MAX_UNDO = 50;
+    /** Max AudioBuffer clones kept across undo+redo (memory guard) */
+    const MAX_BUFFER_SNAPSHOTS = 10;
+
+    const S = {
+      buffer: null,
+      playhead: 0,
+      playing: false,
+      loop: false,
+      baking: false,
+      recording: false,
+      fx: defaultFx(),
+      /** @type {string[]} up to 3 built-in preset ids, click order */
+      presetChain: [],
+      activePresetId: null, // legacy mirror: last chain id or null
+      activeCustomId: null,
+      customSettings: [],
+      videoBlobUrl: null,
+      videoMeta: null,
+      sourceName: '',
+      skipIntervalSec: 5,
+      lastExportFormat: 'wav',
+      advancedLabExpanded: false,
+      presetsSection: 'built-in',
+      /** category expanders — default all open; false = collapsed */
+      presetCatOpen: Object.fromEntries(PRESET_CATS.map((c) => [c, true])),
+      recordSupport: true,
+      micLevel: defaultMicLevel(),
+      inputGain: defaultInputGain(),
+      /**
+       * Most original mono buffer from last record/upload (never mutated by Apply FX).
+       * Working clip is S.buffer; Apply FX overwrites S.buffer only.
+       */
+      originalBuffer: null
+    };
+
+    let audioCtx = null;
+    let masterGain = null;
+    let playSource = null;
+    let playChainCleanup = null;
+    let playStartedAt = 0;
+    let playOffset = 0;
+    let animRaf = 0;
+    let mediaStream = null;
+    let mediaRecorder = null;
+    let recordChunks = [];
+    let recordStartTs = 0;
+    let recordAnalyser = null;
+    let recordMeterRaf = 0;
+    let recordGainNode = null;
+    let recordDest = null;
+    let recordUsedLiveGain = false;
+    let persistTimer = 0;
+    /** FX history (not persisted — session only) */
+    let undoStack = [];
+    let redoStack = [];
+    let historySuspended = false;
+    let edgeToastAt = 0;
+    let lameLoading = null;
+    let longPressTimer = 0;
+    let longPressAccel = null;
+
+    /* =========================================================
+       DOM
+       ========================================================= */
+    const $ = (id) => document.getElementById(id);
+    const els = {
+      btnRecord: $('btnRecord'),
+      btnUpload: $('btnUpload'),
+      fileInput: $('fileInput'),
+      dropzone: $('dropzone'),
+      meterWrap: $('meterWrap'),
+      meterBar: $('meterBar'),
+      recTimer: $('recTimer'),
+      micLevel: $('micLevel'),
+      micLevelVal: $('micLevelVal'),
+      inputGain: $('inputGain'),
+      inputGainVal: $('inputGainVal'),
+      sourceMeta: $('sourceMeta'),
+      videoPreview: $('videoPreview'),
+      wave: $('wave'),
+      waveEmpty: $('waveEmpty'),
+      bakeOverlay: $('bakeOverlay'),
+      timeChip: $('timeChip'),
+      btnPlay: $('btnPlay'),
+      btnStop: $('btnStop'),
+      btnLoop: $('btnLoop'),
+      btnSkipN10: $('btnSkipN10'),
+      btnSkipN5: $('btnSkipN5'),
+      btnSkipP5: $('btnSkipP5'),
+      btnSkipP10: $('btnSkipP10'),
+      btnMoreSkip: $('btnMoreSkip'),
+      frameBtns: $('frameBtns'),
+      btnFramePrev: $('btnFramePrev'),
+      btnFrameNext: $('btnFrameNext'),
+      btnApplyFx: $('btnApplyFx'),
+      btnResetFx: $('btnResetFx'),
+      btnUndo: $('btnUndo'),
+      btnRedo: $('btnRedo'),
+      tabBuiltIn: $('tabBuiltIn'),
+      tabCustom: $('tabCustom'),
+      presetGrid: $('presetGrid'),
+      customEmpty: $('customEmpty'),
+      chainBar: $('chainBar'),
+      chainLabel: $('chainLabel'),
+      btnSaveSettings: $('btnSaveSettings'),
+      btnClearChain: $('btnClearChain'),
+      labDetails: $('labDetails'),
+      fxPanel: $('fxPanel'),
+      btnExportWav: $('btnExportWav'),
+      btnExportMp3: $('btnExportMp3'),
+      btnResetProject: $('btnResetProject'),
+      netPill: $('netPill'),
+      netPillText: $('netPillText'),
+      btnSettings: $('btnSettings'),
+      toasts: $('toasts'),
+      saveModal: $('saveModal'),
+      saveName: $('saveName'),
+      saveCancel: $('saveCancel'),
+      saveConfirm: $('saveConfirm'),
+      saveOverwrite: $('saveOverwrite'),
+      settingsModal: $('settingsModal'),
+      settingsClose: $('settingsClose'),
+      skipInterval: $('skipInterval'),
+      exportPref: $('exportPref'),
+      fxSourceMode: $('fxSourceMode'),
+      fxRemoteUrlGroup: $('fxRemoteUrlGroup'),
+      fxRemoteUrl: $('fxRemoteUrl'),
+      btnReloadFx: $('btnReloadFx'),
+      btnExportCustoms: $('btnExportCustoms'),
+      btnImportCustoms: $('btnImportCustoms'),
+      importCustomsInput: $('importCustomsInput'),
+      btnClearSaved: $('btnClearSaved'),
+      moreSkipModal: $('moreSkipModal'),
+      moreSkipClose: $('moreSkipClose'),
+      btnSkipN10m: $('btnSkipN10m'),
+      btnSkipP10m: $('btnSkipP10m')
+    };
+
+    /* =========================================================
+       Utilities
+       ========================================================= */
+    function toast(msg, type = '') {
+      const el = document.createElement('div');
+      el.className = 'toast' + (type ? ' ' + type : '');
+      el.textContent = msg;
+      els.toasts.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity .25s';
+        setTimeout(() => el.remove(), 280);
+      }, 2800);
+    }
+
+    function fmtTime(sec, withCs = true) {
+      if (!isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      const cs = Math.floor((sec % 1) * 100);
+      const base = m + ':' + String(s).padStart(2, '0');
+      return withCs ? base + '.' + String(cs).padStart(2, '0') : base;
+    }
+
+    function uid() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+
+    function isTypingTarget(el) {
+      if (!el) return false;
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (el.isContentEditable) return true;
+      if (el.closest && el.closest('[contenteditable="true"]')) return true;
+      return false;
+    }
+
+    function fxEqualsDefault(fx) {
+      const d = defaultFx();
+      for (const k of Object.keys(d)) {
+        if (fx[k] !== d[k]) return false;
+      }
+      return true;
+    }
+
+    function mergeFx(partial) {
+      return { ...defaultFx(), ...(partial || {}) };
+    }
+
+    function ensureAudioCtx() {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AC();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 1;
+        masterGain.connect(audioCtx.destination);
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    /* =========================================================
+       Persistence
+       ========================================================= */
+    function clampNum(v, min, max, fallback) {
+      const n = Number(v);
+      if (!isFinite(n)) return fallback;
+      return Math.min(max, Math.max(min, n));
+    }
+
+    function defaultPersisted() {
+      return {
+        version: 3,
+        ui: {
+          loop: false,
+          skipIntervalSec: 5,
+          lastExportFormat: 'wav',
+          advancedLabExpanded: false,
+          presetsSection: 'built-in',
+          micLevel: defaultMicLevel(),
+          inputGain: defaultInputGain(),
+          fxSourceMode: 'local',
+          fxRemoteUrl: '',
+          // expander open state per category (true = expanded)
+          presetCatOpen: Object.fromEntries(PRESET_CATS.map((c) => [c, true]))
+        },
+        fx: defaultFx(),
+        // dual-chain of built-in preset ids (click order)
+        presetChain: [],
+        activePresetId: null, // legacy single-select; migrated into presetChain
+        activeCustomId: null,
+        customSettings: [],
+        updatedAt: Date.now()
+      };
+    }
+
+    function sanitizePresetChain(arr) {
+      if (!Array.isArray(arr)) return [];
+      const known = new Set(BUILTIN_PRESETS.map((p) => p.id));
+      const out = [];
+      for (const id of arr) {
+        const s = String(id);
+        if (!known.has(s)) continue;
+        if (out.includes(s)) continue;
+        out.push(s);
+        if (out.length >= MAX_PRESET_CHAIN) break;
+      }
+      return out;
+    }
+
+    function sanitizeCatOpen(raw) {
+      const base = Object.fromEntries(PRESET_CATS.map((c) => [c, true]));
+      if (!raw || typeof raw !== 'object') return base;
+      for (const c of PRESET_CATS) {
+        if (typeof raw[c] === 'boolean') base[c] = raw[c];
+      }
+      return base;
+    }
+
+    function loadPersisted() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return defaultPersisted();
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== 'object') throw new Error('bad shape');
+        const base = defaultPersisted();
+        const ui = { ...base.ui, ...(data.ui || {}) };
+        if (![1, 3, 5, 10].includes(ui.skipIntervalSec)) ui.skipIntervalSec = 5;
+        if (ui.lastExportFormat !== 'wav' && ui.lastExportFormat !== 'mp3') ui.lastExportFormat = 'wav';
+        if (ui.fxSourceMode !== 'local' && ui.fxSourceMode !== 'github') ui.fxSourceMode = 'local';
+        if (typeof ui.fxRemoteUrl !== 'string') ui.fxRemoteUrl = '';
+        ui.micLevel = clampNum(ui.micLevel, 1, 12, defaultMicLevel());
+        ui.inputGain = clampNum(ui.inputGain, 0.5, 9, defaultInputGain());
+        ui.presetCatOpen = sanitizeCatOpen(ui.presetCatOpen);
+        const customs = Array.isArray(data.customSettings)
+          ? data.customSettings.slice(0, MAX_CUSTOMS).map((c) => ({
+              id: String(c.id || uid()),
+              name: String(c.name || 'Untitled').slice(0, 40),
+              fx: mergeFx(c.fx),
+              createdAt: Number(c.createdAt) || Date.now(),
+              updatedAt: Number(c.updatedAt) || Date.now(),
+              emoji: c.emoji || '⭐'
+            }))
+          : [];
+        // Migrate legacy activePresetId → presetChain
+        let chain = sanitizePresetChain(data.presetChain);
+        if (!chain.length && data.activePresetId) {
+          chain = sanitizePresetChain([data.activePresetId]);
+        }
+        return {
+          version: 3,
+          ui,
+          fx: mergeFx(data.fx),
+          presetChain: chain,
+          activePresetId: chain.length ? chain[chain.length - 1] : null,
+          activeCustomId: data.activeCustomId || null,
+          customSettings: customs,
+          updatedAt: Number(data.updatedAt) || Date.now()
+        };
+      } catch (e) {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) localStorage.setItem(STORAGE_KEY + '.bak', raw);
+        } catch (_) {}
+        toast('Settings were reset (storage was unreadable).', 'error');
+        return defaultPersisted();
+      }
+    }
+
+    function snapshotPersisted() {
+      return {
+        version: 3,
+        ui: {
+          loop: S.loop,
+          skipIntervalSec: S.skipIntervalSec,
+          lastExportFormat: S.lastExportFormat,
+          advancedLabExpanded: S.advancedLabExpanded,
+          presetsSection: S.presetsSection,
+          micLevel: S.micLevel,
+          inputGain: S.inputGain,
+          presetCatOpen: { ...S.presetCatOpen }
+        },
+        fx: { ...S.fx },
+        presetChain: [...S.presetChain],
+        activePresetId: S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null,
+        activeCustomId: S.activeCustomId,
+        customSettings: S.customSettings,
+        updatedAt: Date.now()
+      };
+    }
+
+    function savePersistedNow() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshotPersisted()));
+      } catch (e) {
+        if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+          toast('Storage full — settings may not persist.', 'error');
+        }
+      }
+    }
+
+    function schedulePersist() {
+      clearTimeout(persistTimer);
+      persistTimer = setTimeout(savePersistedNow, 300);
+    }
+
+    function applyPersisted(p) {
+      S.loop = !!p.ui.loop;
+      S.skipIntervalSec = p.ui.skipIntervalSec;
+      S.lastExportFormat = p.ui.lastExportFormat;
+      S.advancedLabExpanded = !!p.ui.advancedLabExpanded;
+      S.presetsSection = p.ui.presetsSection === 'custom' ? 'custom' : 'built-in';
+      S.fx = mergeFx(p.fx);
+      S.presetChain = sanitizePresetChain(p.presetChain);
+      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
+      S.activeCustomId = p.activeCustomId;
+      S.customSettings = p.customSettings || [];
+      S.presetCatOpen = sanitizeCatOpen(p.ui.presetCatOpen);
+      S.micLevel = clampNum(p.ui.micLevel, 1, 12, defaultMicLevel());
+      S.inputGain = clampNum(p.ui.inputGain, 0.5, 9, defaultInputGain());
+      els.btnLoop.classList.toggle('active-loop', S.loop);
+      els.btnLoop.setAttribute('aria-pressed', String(S.loop));
+      els.labDetails.open = S.advancedLabExpanded;
+      els.skipInterval.value = String(S.skipIntervalSec);
+      els.exportPref.value = S.lastExportFormat;
+      syncGainSlidersUI();
+      setPresetTab(S.presetsSection, false);
+      updateChainBar();
+      updateUndoButtons();
+    }
+
+    /* =========================================================
+       Undo / Redo (session history — not localStorage)
+       - FX-only: chain (up to 3) + Advanced Lab + inputGain
+       - Audio steps: clone S.buffer for Apply FX / Reset original
+       - Dedupes identical consecutive FX-only states; caps buffer clones
+       ========================================================= */
+    function snapshotHistory(opts = {}) {
+      const includeBuffer = !!opts.includeBuffer && !!S.buffer;
+      return {
+        kind: includeBuffer ? 'audio' : 'fx',
+        fx: { ...S.fx },
+        presetChain: [...S.presetChain],
+        activeCustomId: S.activeCustomId,
+        inputGain: S.inputGain,
+        playhead: S.playhead,
+        hasBuffer: includeBuffer,
+        bufferDropped: false,
+        // Clone so later mutations cannot corrupt the stack
+        buffer: includeBuffer ? cloneBuffer(S.buffer) : null
+      };
+    }
+
+    function releaseSnapBuffer(snap) {
+      if (!snap) return;
+      snap.buffer = null;
+      if (snap.hasBuffer) snap.bufferDropped = true;
+      snap.hasBuffer = false;
+    }
+
+    function releaseSnap(snap) {
+      releaseSnapBuffer(snap);
+    }
+
+    function countBufferSnaps() {
+      let n = 0;
+      for (const s of undoStack) if (s && s.hasBuffer && s.buffer) n++;
+      for (const s of redoStack) if (s && s.hasBuffer && s.buffer) n++;
+      return n;
+    }
+
+    /** Drop oldest buffer clones first (undo bottom, then redo bottom). */
+    function pruneBufferSnapshots() {
+      while (countBufferSnaps() > MAX_BUFFER_SNAPSHOTS) {
+        let dropped = false;
+        for (let i = 0; i < undoStack.length; i++) {
+          if (undoStack[i].hasBuffer && undoStack[i].buffer) {
+            releaseSnapBuffer(undoStack[i]);
+            dropped = true;
+            break;
+          }
+        }
+        if (dropped) continue;
+        for (let i = 0; i < redoStack.length; i++) {
+          if (redoStack[i].hasBuffer && redoStack[i].buffer) {
+            releaseSnapBuffer(redoStack[i]);
+            dropped = true;
+            break;
+          }
+        }
+        if (!dropped) break;
+      }
+    }
+
+    function trimHistoryLength() {
+      while (undoStack.length > MAX_UNDO) releaseSnap(undoStack.shift());
+      while (redoStack.length > MAX_UNDO) releaseSnap(redoStack.shift());
+      pruneBufferSnapshots();
+    }
+
+    function fxStateEqual(a, b) {
+      if (!a || !b) return false;
+      if (a.hasBuffer || b.hasBuffer) return false;
+      if (clampNum(a.inputGain, 0.5, 9, 1) !== clampNum(b.inputGain, 0.5, 9, 1)) return false;
+      if ((a.activeCustomId || null) !== (b.activeCustomId || null)) return false;
+      const ca = (a.presetChain || []).join('\0');
+      const cb = (b.presetChain || []).join('\0');
+      if (ca !== cb) return false;
+      const keys = Object.keys(defaultFx());
+      for (const k of keys) {
+        const va = a.fx[k];
+        const vb = b.fx[k];
+        if (typeof va === 'number' || typeof vb === 'number') {
+          if (Math.abs((va || 0) - (vb || 0)) > 1e-5) return false;
+        } else if (va !== vb) return false;
+      }
+      return true;
+    }
+
+    function restoreBufferFromSnap(snap) {
+      if (!snap || !snap.hasBuffer || !snap.buffer) return false;
+      stopPlayback(false);
+      S.buffer = cloneBuffer(snap.buffer);
+      const dur = S.buffer.duration || 0;
+      S.playhead = Math.max(0, Math.min(dur, snap.playhead || 0));
+      els.waveEmpty.classList.add('hidden');
+      if (S.sourceName) {
+        els.sourceMeta.textContent =
+          S.sourceName + ' · mono · ' + fmtTime(dur, false) + ' · ' + S.buffer.sampleRate + ' Hz';
+      }
+      updateTimeChip();
+      drawWave();
+      syncVideo();
+      return true;
+    }
+
+    function applyHistory(snap) {
+      if (!snap) return;
+      historySuspended = true;
+      const wasPlaying = S.playing;
+      stopPlayback(false);
+
+      S.fx = mergeFx(snap.fx);
+      S.presetChain = sanitizePresetChain(snap.presetChain);
+      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
+      S.activeCustomId = snap.activeCustomId || null;
+      S.inputGain = clampNum(snap.inputGain, 0.5, 9, defaultInputGain());
+
+      // Restore audio when this history step captured a buffer (bake / reset-original)
+      if (snap.hasBuffer && snap.buffer) {
+        restoreBufferFromSnap(snap);
+      } else if (S.buffer) {
+        // FX-only step (or buffer was pruned): keep current audio, clamp playhead
+        S.playhead = Math.max(0, Math.min(S.buffer.duration, snap.playhead || S.playhead || 0));
+        updateTimeChip();
+        drawWave();
+        if (snap.bufferDropped) {
+          // Soft notice once — audio part of this step was GC'd for memory
+          // (FX still restores correctly)
+        }
+      }
+
+      rebuildFxPanel();
+      syncGainSlidersUI();
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      historySuspended = false;
+      updateUndoButtons();
+      if (wasPlaying && S.buffer) startPlayback();
+    }
+
+    /**
+     * @param {{ includeBuffer?: boolean }} [opts]
+     * includeBuffer: true when working audio is about to change (Apply FX / Reset original)
+     */
+    function pushHistory(opts = {}) {
+      if (historySuspended) return;
+      const snap = snapshotHistory(opts);
+      const last = undoStack[undoStack.length - 1];
+      // Skip no-op consecutive FX-only states (same chain + sliders)
+      if (!snap.hasBuffer && last && fxStateEqual(last, snap)) return;
+      undoStack.push(snap);
+      // New branch kills redo
+      while (redoStack.length) releaseSnap(redoStack.pop());
+      trimHistoryLength();
+      updateUndoButtons();
+    }
+
+    function undoFx() {
+      if (!undoStack.length) return;
+      const target = undoStack[undoStack.length - 1];
+      // Capture current for redo; include audio if this step (or target) is audio-related
+      const needBuf = !!(target && (target.hasBuffer || target.kind === 'audio'));
+      const current = snapshotHistory({ includeBuffer: needBuf });
+      redoStack.push(current);
+      trimHistoryLength();
+      applyHistory(undoStack.pop());
+      const audioMsg = target && (target.hasBuffer || target.kind === 'audio');
+      toast(audioMsg ? 'Undo (audio + FX)' : 'Undo');
+    }
+
+    function redoFx() {
+      if (!redoStack.length) return;
+      const target = redoStack[redoStack.length - 1];
+      const needBuf = !!(target && (target.hasBuffer || target.kind === 'audio'));
+      undoStack.push(snapshotHistory({ includeBuffer: needBuf }));
+      trimHistoryLength();
+      applyHistory(redoStack.pop());
+      const audioMsg = target && (target.hasBuffer || target.kind === 'audio');
+      toast(audioMsg ? 'Redo (audio + FX)' : 'Redo');
+    }
+
+    function updateUndoButtons() {
+      if (els.btnUndo) els.btnUndo.disabled = undoStack.length === 0;
+      if (els.btnRedo) els.btnRedo.disabled = redoStack.length === 0;
+    }
+
+    function clearHistory() {
+      while (undoStack.length) releaseSnap(undoStack.pop());
+      while (redoStack.length) releaseSnap(redoStack.pop());
+      updateUndoButtons();
+    }
+
+    /* =========================================================
+       Preset chain (up to 3) → Advanced Lab sliders
+       ========================================================= */
+    function getPresetById(id) {
+      return BUILTIN_PRESETS.find((p) => p.id === id) || null;
+    }
+
+    /** Blend second partial onto full base (click order: base then next). */
+    function blendPartialOnto(base, partial) {
+      const d = defaultFx();
+      const out = { ...base };
+      for (const [k, v] of Object.entries(partial || {})) {
+        if (!(k in d)) continue;
+        if (typeof d[k] === 'boolean') {
+          out[k] = !!(out[k] || v);
+          continue;
+        }
+        // Additive offsets (treat preset values as deltas from default 0-ish ranges)
+        if (k === 'pitchSemi' || k === 'formant' || k === 'bass' || k === 'mid' || k === 'treble') {
+          out[k] = out[k] + v;
+          continue;
+        }
+        if (k === 'speed' || k === 'gain') {
+          out[k] = out[k] * (v === 0 ? 1 : v);
+          continue;
+        }
+        // Wet mixes: screen blend so both contribute without hard overwrite
+        if (
+          k === 'bpMix' || k === 'distortion' || k === 'noiseMix' || k === 'reverbMix' ||
+          k === 'delayMix' || k === 'chorus' || k === 'flanger' || k === 'tremolo' ||
+          k === 'vibrato' || k === 'sampleRateCrush' || k === 'bitcrush' || k === 'fadeIn' || k === 'fadeOut'
+        ) {
+          out[k] = out[k] + v * (1 - Math.min(1, Math.max(0, out[k])));
+          continue;
+        }
+        if (k === 'lowpass') {
+          out[k] = Math.min(out[k], v);
+          continue;
+        }
+        if (k === 'highpass') {
+          out[k] = Math.max(out[k], v);
+          continue;
+        }
+        if (k === 'delayFeedback' || k === 'reverbSize' || k === 'reverbDecay' || k === 'delayTime') {
+          out[k] = Math.max(out[k], v);
+          continue;
+        }
+        // Rates / freqs / compressor: last specified wins
+        out[k] = v;
+      }
+      // Soft clamp common ranges
+      out.pitchSemi = Math.max(-12, Math.min(12, out.pitchSemi));
+      out.formant = Math.max(-12, Math.min(12, out.formant));
+      out.speed = Math.max(0.5, Math.min(2, out.speed));
+      out.gain = Math.max(0, Math.min(3, out.gain));
+      out.bass = Math.max(-12, Math.min(12, out.bass));
+      out.mid = Math.max(-12, Math.min(12, out.mid));
+      out.treble = Math.max(-12, Math.min(12, out.treble));
+      for (const mk of ['bpMix', 'distortion', 'noiseMix', 'reverbMix', 'delayMix', 'chorus', 'flanger', 'tremolo', 'vibrato', 'sampleRateCrush', 'bitcrush']) {
+        out[mk] = Math.max(0, Math.min(1, out[mk]));
+      }
+      out.lowpass = Math.max(200, Math.min(18000, out.lowpass));
+      out.highpass = Math.max(20, Math.min(4000, out.highpass));
+      return out;
+    }
+
+    /** Compute S.fx from presetChain (1–3) in click order → Advanced Lab. */
+    function recomputeFxFromChain() {
+      if (!S.presetChain.length) return;
+      let fx = null;
+      const kept = [];
+      for (const id of S.presetChain) {
+        const p = getPresetById(id);
+        if (!p) continue;
+        kept.push(id);
+        fx = fx ? blendPartialOnto(fx, p.fx) : mergeFx(p.fx);
+      }
+      S.presetChain = kept.slice(0, MAX_PRESET_CHAIN);
+      if (!fx || !S.presetChain.length) {
+        S.presetChain = [];
+        S.activePresetId = null;
+        return;
+      }
+      S.fx = fx;
+      S.activePresetId = S.presetChain[S.presetChain.length - 1];
+      S.activeCustomId = null;
+    }
+
+    function updateChainBar() {
+      if (!els.chainBar || !els.chainLabel) return;
+      if (!S.presetChain.length) {
+        els.chainLabel.innerHTML =
+          'Tap up to <strong>3</strong> presets in order — they combine into Advanced Lab sliders (then tweak freely).';
+        return;
+      }
+      const parts = S.presetChain.map((id, i) => {
+        const p = getPresetById(id);
+        const name = p ? (p.emoji + ' ' + p.name) : id;
+        return (
+          '<span class="chain-step step-' +
+          (i + 1) +
+          '"><span class="ord">' +
+          (i + 1) +
+          '</span> ' +
+          name +
+          '</span>'
+        );
+      });
+      const hint =
+        S.presetChain.length < MAX_PRESET_CHAIN
+          ? ' <span style="margin-left:6px">· tap another to chain (' +
+            S.presetChain.length +
+            '/' +
+            MAX_PRESET_CHAIN +
+            ')</span>'
+          : ' <span style="margin-left:6px">· full chain → sliders (tap a slot to remove)</span>';
+      els.chainLabel.innerHTML =
+        '<span class="chain-steps">' +
+        parts.join('<span class="chain-arrow">→</span>') +
+        '</span>' +
+        hint;
+    }
+
+    /**
+     * Toggle/add built-in preset into chain (click order, max 3).
+     * - Click selected slot: remove it and recompute
+     * - Click new with room: append
+     * - Click new at capacity: drop oldest, append (rolling window of 3)
+     */
+    function togglePresetInChain(presetId) {
+      pushHistory();
+      const idx = S.presetChain.indexOf(presetId);
+      if (idx >= 0) {
+        S.presetChain.splice(idx, 1);
+        if (S.presetChain.length) {
+          recomputeFxFromChain();
+        } else {
+          S.fx = defaultFx();
+          S.activePresetId = null;
+        }
+      } else {
+        if (S.presetChain.length >= MAX_PRESET_CHAIN) {
+          S.presetChain.shift();
+        }
+        S.presetChain.push(presetId);
+        recomputeFxFromChain();
+      }
+      S.activeCustomId = null;
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      if (S.playing) startPlayback();
+      if (S.presetChain.length) {
+        const names = S.presetChain.map((id) => (getPresetById(id) || {}).name || id);
+        toast(
+          names.length > 1 ? 'Chain: ' + names.join(' → ') : 'Preset: ' + names[0]
+        );
+      } else {
+        toast('Chain cleared');
+      }
+    }
+
+    function clearPresetChain(fromHistory) {
+      if (!S.presetChain.length && !S.activeCustomId && fxEqualsDefault(S.fx)) return;
+      if (!fromHistory) pushHistory();
+      S.presetChain = [];
+      S.activePresetId = null;
+      S.activeCustomId = null;
+      S.fx = defaultFx();
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      if (S.playing) startPlayback();
+      toast('Chain cleared');
+    }
+
+    function formatGainX(v) {
+      return (Math.round(v * 10) / 10).toFixed(1) + '×';
+    }
+
+    function syncGainSlidersUI() {
+      if (els.micLevel) {
+        els.micLevel.value = String(S.micLevel);
+        els.micLevelVal.textContent = formatGainX(S.micLevel);
+      }
+      if (els.inputGain) {
+        els.inputGain.value = String(S.inputGain);
+        els.inputGainVal.textContent = formatGainX(S.inputGain);
+      }
+      // Keep lab Dynamics "Input gain" in sync if mounted
+      const labIn = document.getElementById('fx_inputGain');
+      const labVal = document.querySelector('[data-val="inputGain"]');
+      if (labIn) labIn.value = String(S.inputGain);
+      if (labVal) labVal.textContent = formatFxVal('inputGain', S.inputGain, '×');
+    }
+
+    /* =========================================================
+       Buffer helpers (incl. iPad / quiet-mic normalize)
+       ========================================================= */
+    function cloneBuffer(src) {
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+      for (let c = 0; c < src.numberOfChannels; c++) {
+        out.copyToChannel(src.getChannelData(c).slice(), c);
+      }
+      return out;
+    }
+
+    function toMonoBuffer(src) {
+      const ctx = ensureAudioCtx();
+      if (src.numberOfChannels === 1) {
+        const out = ctx.createBuffer(1, src.length, src.sampleRate);
+        out.copyToChannel(src.getChannelData(0).slice(), 0);
+        return out;
+      }
+      const out = ctx.createBuffer(1, src.length, src.sampleRate);
+      const dest = out.getChannelData(0);
+      const chans = [];
+      for (let c = 0; c < src.numberOfChannels; c++) chans.push(src.getChannelData(c));
+      const n = chans.length;
+      for (let i = 0; i < src.length; i++) {
+        let sum = 0;
+        for (let c = 0; c < n; c++) sum += chans[c][i];
+        dest[i] = sum / n;
+      }
+      return out;
+    }
+
+    /** Multiply mono buffer by gain; soft-clip peaks with tanh so large mic boosts don't brickwall-harsh. */
+    function applyBufferGain(buf, gain) {
+      if (!buf || !isFinite(gain) || Math.abs(gain - 1) < 1e-6) return buf;
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(1, buf.length, buf.sampleRate);
+      const src = buf.getChannelData(0);
+      const dest = out.getChannelData(0);
+      for (let i = 0; i < src.length; i++) {
+        let s = src[i] * gain;
+        if (s > 0.95 || s < -0.95) s = Math.tanh(s);
+        if (s > 1) s = 1;
+        else if (s < -1) s = -1;
+        dest[i] = s;
+      }
+      return out;
+    }
+
+    /**
+     * Peak-normalize for quiet iPhone/iPad/Safari mics.
+     * maxGain defaults high (32×) because Safari peaks are often << 0.1.
+     * extraGain multiplies after normalize (mic level when not applied live).
+     */
+    function normalizeRecordingBuffer(buf, opts = {}) {
+      const maxGain = opts.maxGain != null ? opts.maxGain : MAX_NORM_GAIN;
+      const targetPeak = opts.targetPeak != null ? opts.targetPeak : TARGET_PEAK;
+      const extraGain = opts.extraGain != null ? opts.extraGain : 1;
+      const data = buf.getChannelData(0);
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) {
+        const a = Math.abs(data[i]);
+        if (a > peak) peak = a;
+      }
+      if (peak < 1e-8) return buf;
+      let gain = 1;
+      if (peak < SKIP_NORM_PEAK) {
+        gain = targetPeak / peak;
+        if (gain > maxGain) gain = maxGain;
+      }
+      gain *= extraGain;
+      if (Math.abs(gain - 1) < 1e-6) return buf;
+      return applyBufferGain(buf, gain);
+    }
+
+    function peakOf(buf) {
+      const d = buf.getChannelData(0);
+      let p = 0;
+      for (let i = 0; i < d.length; i++) {
+        const a = Math.abs(d[i]);
+        if (a > p) p = a;
+      }
+      return p;
+    }
+
+    function applyPeakLimiter(buf, target = LIMITER_PEAK) {
+      const peak = peakOf(buf);
+      if (peak <= target || peak < 1e-8) return buf;
+      const g = target / peak;
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(1, buf.length, buf.sampleRate);
+      const src = buf.getChannelData(0);
+      const dest = out.getChannelData(0);
+      for (let i = 0; i < src.length; i++) dest[i] = src[i] * g;
+      return out;
+    }
+
+    function reverseBuffer(buf) {
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(1, buf.length, buf.sampleRate);
+      const s = buf.getChannelData(0);
+      const d = out.getChannelData(0);
+      for (let i = 0; i < s.length; i++) d[i] = s[s.length - 1 - i];
+      return out;
+    }
+
+    function applyFadesAndCrush(buf, fx) {
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(1, buf.length, buf.sampleRate);
+      const s = buf.getChannelData(0);
+      const d = out.getChannelData(0);
+      const sr = buf.sampleRate;
+      const fadeInN = Math.min(buf.length, Math.floor((fx.fadeIn || 0) * sr));
+      const fadeOutN = Math.min(buf.length, Math.floor((fx.fadeOut || 0) * sr));
+      const bit = fx.bitcrush || 0;
+      const levels = bit > 0 ? Math.max(2, Math.round(Math.pow(2, 16 - bit * 14))) : 0;
+      const crush = fx.sampleRateCrush || 0;
+      const holdEvery = crush > 0 ? Math.max(1, Math.round(1 + crush * 24)) : 1;
+      let held = 0;
+      let holdVal = 0;
+      for (let i = 0; i < s.length; i++) {
+        let v = s[i];
+        if (holdEvery > 1) {
+          if (i % holdEvery === 0) holdVal = v;
+          v = holdVal;
+        }
+        if (levels > 0) {
+          v = Math.round(v * levels) / levels;
+        }
+        if (fadeInN > 0 && i < fadeInN) v *= i / fadeInN;
+        if (fadeOutN > 0 && i >= s.length - fadeOutN) v *= (s.length - 1 - i) / fadeOutN;
+        d[i] = v;
+      }
+      return out;
+    }
+
+    /* =========================================================
+       FX chain (live + offline)
+       ========================================================= */
+    function makeImpulse(ctx, seconds, decay, size) {
+      const len = Math.max(1, Math.floor(ctx.sampleRate * seconds * (0.5 + size * 0.5)));
+      // Match offline graph channel count (mono export path uses 1 ch)
+      const chCount = Math.min(2, Math.max(1, ctx.destination && ctx.destination.channelCount ? ctx.destination.channelCount : 2));
+      const impulse = ctx.createBuffer(chCount, len, ctx.sampleRate);
+      for (let c = 0; c < chCount; c++) {
+        const ch = impulse.getChannelData(c);
+        for (let i = 0; i < len; i++) {
+          ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.5 + decay);
+        }
+      }
+      return impulse;
+    }
+
+    /**
+     * Builds graph: returns { input, output, startSource(buffer, offset), stop(), rate }
+     * For offline, pass offline ctx and connect output to destination yourself.
+     */
+    function buildFxChain(ctx, fx, opts = {}) {
+      const offline = !!opts.offline;
+      const nodes = [];
+      // Cascaded gains: Input gain (S.inputGain) → …FX… → FX gain (fx.gain)
+      const input = ctx.createGain();
+      const preGain = opts.inputGain != null ? opts.inputGain : (S.inputGain || 1);
+      input.gain.value = Math.max(0.01, preGain);
+
+      // EQ / filters
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = Math.max(20, fx.highpass);
+      hp.Q.value = 0.7;
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = Math.min(20000, fx.lowpass);
+      lp.Q.value = 0.7;
+
+      const formantRatio = Math.pow(2, (fx.formant || 0) / 12);
+      const bass = ctx.createBiquadFilter();
+      bass.type = 'lowshelf';
+      bass.frequency.value = 120 * formantRatio;
+      bass.gain.value = fx.bass || 0;
+
+      const mid = ctx.createBiquadFilter();
+      mid.type = 'peaking';
+      mid.frequency.value = 1000 * formantRatio;
+      mid.Q.value = 1;
+      mid.gain.value = fx.mid || 0;
+
+      const treble = ctx.createBiquadFilter();
+      treble.type = 'highshelf';
+      treble.frequency.value = 4000 * formantRatio;
+      treble.gain.value = fx.treble || 0;
+
+      input.connect(hp);
+      hp.connect(lp);
+      lp.connect(bass);
+      bass.connect(mid);
+      mid.connect(treble);
+
+      let head = treble;
+
+      // Bandpass wet/dry
+      if ((fx.bpMix || 0) > 0.001) {
+        const dryG = ctx.createGain();
+        const wetG = ctx.createGain();
+        dryG.gain.value = 1 - fx.bpMix;
+        wetG.gain.value = fx.bpMix;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = fx.bpFreq * formantRatio;
+        bp.Q.value = Math.max(0.2, fx.bpQ);
+        const merge = ctx.createGain();
+        head.connect(dryG);
+        head.connect(bp);
+        bp.connect(wetG);
+        dryG.connect(merge);
+        wetG.connect(merge);
+        head = merge;
+      }
+
+      // Distortion
+      if ((fx.distortion || 0) > 0.001) {
+        const shaper = ctx.createWaveShaper();
+        const amount = fx.distortion;
+        const n = 256;
+        const curve = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const x = (i * 2) / n - 1;
+          curve[i] = ((1 + amount * 4) * x) / (1 + amount * 4 * Math.abs(x));
+        }
+        shaper.curve = curve;
+        shaper.oversample = '2x';
+        head.connect(shaper);
+        head = shaper;
+      }
+
+      // Ring mod: dry + VCA modulated by sine carrier
+      if ((fx.ringFreq || 0) > 0.1) {
+        const dry = ctx.createGain();
+        dry.gain.value = 0.35;
+        const vca = ctx.createGain();
+        vca.gain.value = 0;
+        const osc = ctx.createOscillator();
+        osc.frequency.value = fx.ringFreq;
+        osc.type = 'sine';
+        const depth = ctx.createGain();
+        depth.gain.value = 0.65;
+        const merge = ctx.createGain();
+        head.connect(dry);
+        head.connect(vca);
+        osc.connect(depth);
+        depth.connect(vca.gain);
+        dry.connect(merge);
+        vca.connect(merge);
+        try { osc.start(0); } catch (_) {}
+        nodes.push(osc);
+        head = merge;
+      }
+
+      // Noise mix
+      if ((fx.noiseMix || 0) > 0.001) {
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.value = fx.noiseMix;
+        const merge = ctx.createGain();
+        head.connect(merge);
+        const bufferSize = Math.floor(ctx.sampleRate * 2);
+        const noiseBuf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const nd = noiseBuf.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) nd[i] = Math.random() * 2 - 1;
+        const noiseSrc = ctx.createBufferSource();
+        noiseSrc.buffer = noiseBuf;
+        noiseSrc.loop = true;
+        noiseSrc.connect(noiseGain);
+        noiseGain.connect(merge);
+        try { noiseSrc.start(0); } catch (_) {}
+        nodes.push(noiseSrc);
+        head = merge;
+      }
+
+      // Delay
+      if ((fx.delayMix || 0) > 0.001 && (fx.delayTime || 0) > 0) {
+        const dry = ctx.createGain();
+        const wet = ctx.createGain();
+        dry.gain.value = 1 - fx.delayMix;
+        wet.gain.value = fx.delayMix;
+        const delay = ctx.createDelay(2);
+        delay.delayTime.value = Math.min(1.5, Math.max(0, fx.delayTime));
+        const fb = ctx.createGain();
+        fb.gain.value = Math.min(0.9, fx.delayFeedback || 0);
+        const merge = ctx.createGain();
+        head.connect(dry);
+        head.connect(delay);
+        delay.connect(fb);
+        fb.connect(delay);
+        delay.connect(wet);
+        dry.connect(merge);
+        wet.connect(merge);
+        head = merge;
+      }
+
+      // Chorus / flanger via delay LFO
+      function attachModDelay(from, mix, rate, baseDelay, depth) {
+        if (mix <= 0.001) return from;
+        const dry = ctx.createGain();
+        const wet = ctx.createGain();
+        dry.gain.value = 1 - mix * 0.7;
+        wet.gain.value = mix * 0.7;
+        const delay = ctx.createDelay(0.05);
+        delay.delayTime.value = baseDelay;
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = rate;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = depth;
+        lfo.connect(lfoGain);
+        lfoGain.connect(delay.delayTime);
+        const merge = ctx.createGain();
+        from.connect(dry);
+        from.connect(delay);
+        delay.connect(wet);
+        dry.connect(merge);
+        wet.connect(merge);
+        try { lfo.start(0); } catch (_) {}
+        nodes.push(lfo);
+        return merge;
+      }
+      head = attachModDelay(head, fx.chorus || 0, 1.4, 0.012, 0.004);
+      head = attachModDelay(head, fx.flanger || 0, 0.35, 0.004, 0.0025);
+
+      // Tremolo
+      if ((fx.tremolo || 0) > 0.001) {
+        const tGain = ctx.createGain();
+        tGain.gain.value = 1 - (fx.tremolo * 0.5);
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = fx.tremoloRate || 5;
+        const depth = ctx.createGain();
+        depth.gain.value = fx.tremolo * 0.5;
+        lfo.connect(depth);
+        depth.connect(tGain.gain);
+        head.connect(tGain);
+        head = tGain;
+        try { lfo.start(0); } catch (_) {}
+        nodes.push(lfo);
+      }
+
+      // Reverb
+      if ((fx.reverbMix || 0) > 0.001) {
+        const dry = ctx.createGain();
+        const wet = ctx.createGain();
+        dry.gain.value = 1 - fx.reverbMix;
+        wet.gain.value = fx.reverbMix;
+        const conv = ctx.createConvolver();
+        conv.buffer = makeImpulse(ctx, Math.max(0.2, fx.reverbDecay || 1.4), fx.reverbDecay || 1.4, fx.reverbSize || 0.45);
+        const merge = ctx.createGain();
+        head.connect(dry);
+        head.connect(conv);
+        conv.connect(wet);
+        dry.connect(merge);
+        wet.connect(merge);
+        head = merge;
+      }
+
+      // Compressor + FX output gain (cascaded after Input gain at chain head)
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = fx.compressorThresh ?? -18;
+      comp.ratio.value = fx.compressorRatio ?? 3;
+      comp.attack.value = 0.005;
+      comp.release.value = 0.12;
+      const outGain = ctx.createGain();
+      outGain.gain.value = fx.gain ?? 1;
+      head.connect(comp);
+      comp.connect(outGain);
+
+      const rate = Math.max(0.25, Math.min(4, (fx.speed || 1) * Math.pow(2, (fx.pitchSemi || 0) / 12)));
+      // vibrato on playback rate handled by source
+
+      return {
+        input,
+        output: outGain,
+        rate,
+        vibrato: fx.vibrato || 0,
+        vibratoRate: fx.vibratoRate || 5,
+        stopExtras() {
+          for (const n of nodes) {
+            try { n.stop(); } catch (_) {}
+            try { n.disconnect(); } catch (_) {}
+          }
+          nodes.length = 0;
+        }
+      };
+    }
+
+    /* =========================================================
+       Playback
+       ========================================================= */
+    function stopPlayback(resetHead = false) {
+      if (playSource) {
+        try { playSource.onended = null; playSource.stop(); } catch (_) {}
+        try { playSource.disconnect(); } catch (_) {}
+        playSource = null;
+      }
+      if (playChainCleanup) {
+        try { playChainCleanup(); } catch (_) {}
+        playChainCleanup = null;
+      }
+      if (S.playing) {
+        const ctx = audioCtx;
+        if (ctx) {
+          S.playhead = Math.min(S.buffer ? S.buffer.duration : 0, playOffset + Math.max(0, (ctx.currentTime - playStartedAt) * (S._playRate || 1)));
+        }
+      }
+      S.playing = false;
+      cancelAnimationFrame(animRaf);
+      if (resetHead) S.playhead = 0;
+      updatePlayButton();
+      updateTimeChip();
+      drawWave();
+      syncVideo();
+      try {
+        els.videoPreview.pause();
+      } catch (_) {}
+    }
+
+    function updatePlayButton() {
+      els.btnPlay.textContent = S.playing ? '⏸ Pause' : '▶ Play';
+      els.btnPlay.setAttribute('aria-label', S.playing ? 'Pause' : 'Play');
+    }
+
+    function startPlayback() {
+      if (!S.buffer || S.baking) return;
+      const ctx = ensureAudioCtx();
+      stopPlayback(false);
+
+      let buf = S.buffer;
+      if (S.fx.reverse) buf = reverseBuffer(buf);
+
+      // Pre-apply crush/fades lightly for live: only fades on gain envelope; crush via offline-ish skip for perf
+      // Live path uses chain; crush applied as wave shaper approximation only on bake/export for performance.
+      const chain = buildFxChain(ctx, S.fx);
+      chain.output.connect(masterGain);
+
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      let rate = chain.rate;
+      src.playbackRate.value = rate;
+      S._playRate = rate;
+
+      if ((S.fx.vibrato || 0) > 0.001) {
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = S.fx.vibratoRate || 5;
+        const depth = ctx.createGain();
+        depth.gain.value = (S.fx.vibrato || 0) * 0.03 * rate;
+        lfo.connect(depth);
+        depth.connect(src.playbackRate);
+        try { lfo.start(0); } catch (_) {}
+        playChainCleanup = () => {
+          try { lfo.stop(); } catch (_) {}
+          chain.stopExtras();
+          try { chain.output.disconnect(); } catch (_) {}
+        };
+      } else {
+        playChainCleanup = () => {
+          chain.stopExtras();
+          try { chain.output.disconnect(); } catch (_) {}
+        };
+      }
+
+      src.connect(chain.input);
+      const offset = Math.max(0, Math.min(buf.duration - 0.001, S.playhead));
+      playOffset = offset;
+      playStartedAt = ctx.currentTime;
+      playSource = src;
+      S.playing = true;
+      updatePlayButton();
+
+      src.onended = () => {
+        if (!S.playing) return;
+        if (S.loop) {
+          S.playhead = 0;
+          startPlayback();
+        } else {
+          S.playing = false;
+          S.playhead = S.buffer ? S.buffer.duration : 0;
+          playSource = null;
+          if (playChainCleanup) { playChainCleanup(); playChainCleanup = null; }
+          updatePlayButton();
+          updateTimeChip();
+          drawWave();
+          syncVideo();
+          try { els.videoPreview.pause(); } catch (_) {}
+        }
+      };
+
+      try {
+        src.start(0, offset);
+      } catch (e) {
+        S.playing = false;
+        toast('Playback failed — try again.', 'error');
+        return;
+      }
+
+      // Video sync
+      if (S.videoMeta && els.videoPreview.src) {
+        try {
+          els.videoPreview.currentTime = offset;
+          els.videoPreview.play().catch(() => {});
+        } catch (_) {}
+      }
+
+      const tick = () => {
+        if (!S.playing) return;
+        const t = playOffset + (ctx.currentTime - playStartedAt) * rate;
+        S.playhead = Math.min(buf.duration, Math.max(0, t));
+        updateTimeChip();
+        drawWave();
+        syncVideo(true);
+        animRaf = requestAnimationFrame(tick);
+      };
+      animRaf = requestAnimationFrame(tick);
+    }
+
+    function togglePlay() {
+      if (!S.buffer || S.baking) return;
+      if (S.playing) stopPlayback(false);
+      else {
+        if (S.playhead >= (S.buffer.duration - 0.02)) S.playhead = 0;
+        startPlayback();
+      }
+    }
+
+    function skip(deltaSec) {
+      if (!S.buffer || S.baking) return;
+      const wasPlaying = S.playing;
+      const target = S.playhead + deltaSec;
+      const clamped = Math.max(0, Math.min(S.buffer.duration, target));
+      if (clamped !== target && Date.now() - edgeToastAt > 1000) {
+        toast(clamped <= 0 ? 'Start of track' : 'End of track');
+        edgeToastAt = Date.now();
+      }
+      S.playhead = clamped;
+      if (wasPlaying) startPlayback();
+      else {
+        updateTimeChip();
+        drawWave();
+        syncVideo();
+      }
+    }
+
+    function frameStep(dir) {
+      const fps = (S.videoMeta && S.videoMeta.fps) || 30;
+      skip(dir * (1 / fps));
+    }
+
+    function syncVideo(soft) {
+      if (!S.videoMeta || !els.videoPreview.src) return;
+      try {
+        if (!soft || Math.abs(els.videoPreview.currentTime - S.playhead) > 0.12) {
+          els.videoPreview.currentTime = S.playhead;
+        }
+      } catch (_) {}
+    }
+
+    /* =========================================================
+       Waveform
+       ========================================================= */
+    function resizeWave() {
+      const canvas = els.wave;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      drawWave();
+    }
+
+    function drawWave() {
+      const canvas = els.wave;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      // bg
+      ctx.fillStyle = '#0a1018';
+      ctx.fillRect(0, 0, w, h);
+
+      if (!S.buffer) return;
+      const data = S.buffer.getChannelData(0);
+      const step = Math.max(1, Math.floor(data.length / w));
+      const mid = h / 2;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.globalAlpha = 0.9;
+      ctx.lineWidth = Math.max(1, canvas.width / 900);
+      ctx.beginPath();
+      for (let x = 0; x < w; x++) {
+        const start = x * step;
+        let min = 1, max = -1;
+        for (let i = 0; i < step; i++) {
+          const v = data[start + i] || 0;
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+        const y1 = mid + min * mid * 0.92;
+        const y2 = mid + max * mid * 0.92;
+        ctx.moveTo(x, y1);
+        ctx.lineTo(x, y2);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // playhead
+      const dur = S.buffer.duration || 1;
+      const px = (S.playhead / dur) * w;
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = Math.max(2, canvas.width / 400);
+      ctx.beginPath();
+      ctx.moveTo(px, 0);
+      ctx.lineTo(px, h);
+      ctx.stroke();
+    }
+
+    function seekFromEvent(e) {
+      if (!S.buffer || S.baking) return;
+      const rect = els.wave.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const wasPlaying = S.playing;
+      S.playhead = (x / rect.width) * S.buffer.duration;
+      if (wasPlaying) startPlayback();
+      else {
+        updateTimeChip();
+        drawWave();
+        syncVideo();
+      }
+    }
+
+    function updateTimeChip() {
+      const cur = S.playhead || 0;
+      const dur = S.buffer ? S.buffer.duration : 0;
+      els.timeChip.innerHTML = '<b>' + fmtTime(cur) + '</b> / ' + fmtTime(dur);
+    }
+
+    /* =========================================================
+       Set buffer / UI state
+       ========================================================= */
+    function revokeVideo() {
+      if (S.videoBlobUrl) {
+        try { URL.revokeObjectURL(S.videoBlobUrl); } catch (_) {}
+      }
+      S.videoBlobUrl = null;
+      S.videoMeta = null;
+      els.videoPreview.removeAttribute('src');
+      els.videoPreview.load();
+      els.videoPreview.classList.remove('show');
+      els.frameBtns.classList.remove('show');
+    }
+
+    function setBuffer(buf, meta = {}) {
+      stopPlayback(true);
+      S.buffer = buf;
+      // Freeze "most original" at ingest (record / upload). Apply FX never overwrites this.
+      S.originalBuffer = buf ? cloneBuffer(buf) : null;
+      S.playhead = 0;
+      S.sourceName = meta.name || S.sourceName || 'Audio';
+      // New source invalidates prior edit history
+      clearHistory();
+      if (meta.videoFile) {
+        revokeVideo();
+        S.videoBlobUrl = URL.createObjectURL(meta.videoFile);
+        els.videoPreview.src = S.videoBlobUrl;
+        els.videoPreview.muted = true;
+        els.videoPreview.playsInline = true;
+        els.videoPreview.classList.add('show');
+        S.videoMeta = {
+          name: meta.videoFile.name,
+          type: meta.videoFile.type,
+          duration: buf.duration,
+          width: 0,
+          height: 0,
+          fps: 30
+        };
+        els.frameBtns.classList.add('show');
+        els.videoPreview.onloadedmetadata = () => {
+          S.videoMeta.width = els.videoPreview.videoWidth;
+          S.videoMeta.height = els.videoPreview.videoHeight;
+          // Heuristic fps — browsers rarely expose true fps
+          S.videoMeta.fps = 30;
+        };
+      } else if (meta.clearVideo) {
+        revokeVideo();
+      }
+      els.waveEmpty.classList.add('hidden');
+      els.sourceMeta.textContent = S.sourceName + ' · mono · ' + fmtTime(buf.duration, false) + ' · ' + buf.sampleRate + ' Hz';
+      updateTransportEnabled();
+      updateTimeChip();
+      resizeWave();
+      drawWave();
+    }
+
+    /** True when working buffer differs from the ingest original (e.g. after Apply FX). */
+    function bufferIsBakedFromOriginal() {
+      if (!S.buffer || !S.originalBuffer) return false;
+      if (S.buffer === S.originalBuffer) return false;
+      if (S.buffer.length !== S.originalBuffer.length) return true;
+      if (S.buffer.sampleRate !== S.originalBuffer.sampleRate) return true;
+      // Sample-level identity check is expensive; length/rate + reference is enough for UI.
+      // We always clone original, so reference inequality after bake is expected.
+      // Compare a few peaks as cheap dirty check:
+      const a = S.buffer.getChannelData(0);
+      const b = S.originalBuffer.getChannelData(0);
+      if (a.length !== b.length) return true;
+      const step = Math.max(1, Math.floor(a.length / 64));
+      for (let i = 0; i < a.length; i += step) {
+        if (Math.abs(a[i] - b[i]) > 1e-7) return true;
+      }
+      return false;
+    }
+
+    function updateTransportEnabled() {
+      const has = !!S.buffer && !S.baking;
+      const hasBuf = !!S.buffer;
+      [els.btnPlay, els.btnStop, els.btnLoop, els.btnSkipN10, els.btnSkipN5, els.btnSkipP5, els.btnSkipP10, els.btnMoreSkip, els.btnFramePrev, els.btnFrameNext, els.btnExportWav, els.btnExportMp3].forEach((b) => {
+        b.disabled = !has;
+      });
+      // Loop can stay toggleable when has buffer even if baking ends
+      els.btnLoop.disabled = !hasBuf || S.baking;
+      els.btnApplyFx.disabled = !has || fxEqualsDefault(S.fx);
+      els.btnRecord.disabled = S.baking || !S.recordSupport;
+      els.btnUpload.disabled = S.baking;
+      els.bakeOverlay.classList.toggle('show', S.baking);
+    }
+
+    /* =========================================================
+       Recording — desktop / iPad / Android
+       ========================================================= */
+    function pickRecorderMime() {
+      const candidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg;codecs=opus'
+      ];
+      if (!window.MediaRecorder) return '';
+      for (const m of candidates) {
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) return m;
+      }
+      return '';
+    }
+
+    function detectRecordSupport() {
+      const ok = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+      S.recordSupport = ok;
+      if (!ok) {
+        els.btnRecord.disabled = true;
+        els.btnRecord.title = "Recording isn't supported in this browser — try uploading a file instead.";
+        toast("Recording isn't supported in this browser — try uploading a file instead.");
+      }
+    }
+
+    async function startRecording() {
+      if (S.recording || S.baking || !S.recordSupport) return;
+      try {
+        ensureAudioCtx();
+        // Important for iOS/iPad: resume AudioContext inside user gesture
+        await audioCtx.resume();
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: true,
+            // Prefer mono if allowed (not all browsers honor channelCount)
+            channelCount: { ideal: 1 }
+          },
+          video: false
+        });
+      } catch (err) {
+        const name = err && err.name;
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          toast('Microphone access is blocked. Enable it in your browser settings to record.', 'error');
+        } else if (name === 'NotFoundError') {
+          toast('No microphone found.', 'error');
+        } else {
+          toast('Could not open microphone.', 'error');
+        }
+        return;
+      }
+
+      recordChunks = [];
+      recordUsedLiveGain = false;
+      recordGainNode = null;
+      recordDest = null;
+
+      // Route mic → Gain (mic level) → Analyser + MediaStreamDestination → MediaRecorder
+      // so iPad quiet mics are boosted *into* the file, not only after the fact.
+      const srcNode = audioCtx.createMediaStreamSource(mediaStream);
+      recordGainNode = audioCtx.createGain();
+      recordGainNode.gain.value = Math.max(1, S.micLevel || 1);
+      recordAnalyser = audioCtx.createAnalyser();
+      recordAnalyser.fftSize = 2048;
+      recordAnalyser.smoothingTimeConstant = 0.35;
+      srcNode.connect(recordGainNode);
+      recordGainNode.connect(recordAnalyser);
+
+      let recordStream = mediaStream;
+      try {
+        recordDest = audioCtx.createMediaStreamDestination();
+        recordGainNode.connect(recordDest);
+        recordStream = recordDest.stream;
+        recordUsedLiveGain = true;
+      } catch (_) {
+        // Fallback: record raw mic; mic level applied post-stop
+        recordStream = mediaStream;
+        recordUsedLiveGain = false;
+      }
+
+      const mime = pickRecorderMime();
+      try {
+        mediaRecorder = mime
+          ? new MediaRecorder(recordStream, { mimeType: mime, audioBitsPerSecond: 192000 })
+          : new MediaRecorder(recordStream);
+      } catch (_) {
+        try {
+          mediaRecorder = new MediaRecorder(recordStream);
+        } catch (e2) {
+          // Last resort: raw stream without live gain
+          recordUsedLiveGain = false;
+          mediaRecorder = mime
+            ? new MediaRecorder(mediaStream, { mimeType: mime })
+            : new MediaRecorder(mediaStream);
+        }
+      }
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recordChunks.push(e.data);
+      };
+      mediaRecorder.onerror = () => toast('Recording error.', 'error');
+      mediaRecorder.onstop = onRecordStop;
+
+      S.recording = true;
+      recordStartTs = performance.now();
+      els.btnRecord.classList.add('recording');
+      els.btnRecord.textContent = '■ Stop';
+      els.btnRecord.setAttribute('aria-label', 'Stop recording');
+      els.meterWrap.classList.add('show');
+      els.meterWrap.setAttribute('aria-hidden', 'false');
+
+      try {
+        mediaRecorder.start(250);
+      } catch (_) {
+        mediaRecorder.start();
+      }
+      meterTick();
+    }
+
+    function meterTick() {
+      if (!S.recording || !recordAnalyser) return;
+      // Keep live mic gain in sync if user moves slider mid-record
+      if (recordGainNode) {
+        recordGainNode.gain.value = Math.max(1, S.micLevel || 1);
+      }
+      const data = new Uint8Array(recordAnalyser.fftSize);
+      recordAnalyser.getByteTimeDomainData(data);
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = Math.abs(data[i] - 128) / 128;
+        if (v > peak) peak = v;
+      }
+      // Meter already after gain node when live boost is active
+      const visualBoost = recordUsedLiveGain ? 1 : Math.min(4, S.micLevel || 1);
+      const pct = Math.min(100, Math.round(peak * visualBoost * 160));
+      els.meterBar.style.width = pct + '%';
+      const elapsed = (performance.now() - recordStartTs) / 1000;
+      els.recTimer.textContent = fmtTime(elapsed, false);
+      recordMeterRaf = requestAnimationFrame(meterTick);
+    }
+
+    function stopRecording() {
+      if (!S.recording || !mediaRecorder) return;
+      try {
+        if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      } catch (_) {
+        onRecordStop();
+      }
+    }
+
+    async function onRecordStop() {
+      cancelAnimationFrame(recordMeterRaf);
+      S.recording = false;
+      els.btnRecord.classList.remove('recording');
+      els.btnRecord.textContent = '● Record';
+      els.btnRecord.setAttribute('aria-label', 'Record from microphone');
+      els.meterWrap.classList.remove('show');
+      els.meterWrap.setAttribute('aria-hidden', 'true');
+      els.meterBar.style.width = '0%';
+
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((t) => t.stop());
+        mediaStream = null;
+      }
+      try { if (recordGainNode) recordGainNode.disconnect(); } catch (_) {}
+      try { if (recordDest) recordDest.disconnect(); } catch (_) {}
+      recordAnalyser = null;
+      recordGainNode = null;
+      recordDest = null;
+
+      const mime = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
+      mediaRecorder = null;
+      const blob = new Blob(recordChunks, { type: mime });
+      recordChunks = [];
+      const usedLive = recordUsedLiveGain;
+      recordUsedLiveGain = false;
+
+      if (!blob.size) {
+        toast('Recording too short — try again.', 'error');
+        return;
+      }
+
+      try {
+        ensureAudioCtx();
+        const ab = await blob.arrayBuffer();
+        const decoded = await audioCtx.decodeAudioData(ab.slice(0));
+        let mono = toMonoBuffer(decoded);
+        // Auto peak-normalize (up to 32×). If live Web Audio gain was not used,
+        // also bake Mic level here so quiet iPad captures still land loud enough.
+        const extra = usedLive ? 1 : Math.max(1, S.micLevel || 1);
+        mono = normalizeRecordingBuffer(mono, { extraGain: extra, maxGain: MAX_NORM_GAIN });
+        // Safety second pass: if still quiet after caps, force target with remaining headroom
+        const peakAfter = peakOf(mono);
+        if (peakAfter > 1e-8 && peakAfter < 0.35) {
+          const boost = Math.min(TARGET_PEAK / peakAfter, 12);
+          mono = applyBufferGain(mono, boost);
+        }
+        if (mono.duration < 0.05) {
+          toast('Recording too short — try again.', 'error');
+          return;
+        }
+        // Replace confirm after stop+normalize (PRD §19.5)
+        if (S.buffer) {
+          const ok = confirm('Replace current audio with this recording? Your current clip will be discarded.');
+          if (!ok) {
+            toast('Recording discarded');
+            return;
+          }
+        }
+        setBuffer(mono, { name: 'Recording', clearVideo: true });
+        toast('Recording ready', 'ok');
+      } catch (e) {
+        console.error(e);
+        toast("Couldn't process recording. Try again.", 'error');
+      }
+    }
+
+    function toggleRecord() {
+      if (S.recording) stopRecording();
+      else startRecording();
+    }
+
+    /* =========================================================
+       Upload / decode
+       ========================================================= */
+    function isVideoFile(file) {
+      const t = (file.type || '').toLowerCase();
+      const n = (file.name || '').toLowerCase();
+      if (t.startsWith('video/')) return true;
+      return /\.(mp4|mov|m4v|webm)$/i.test(n);
+    }
+
+    async function loadFile(file) {
+      if (!file) return;
+      if (file.size > LARGE_FILE_BYTES) {
+        toast('Large file — this may take a moment to decode.');
+      }
+      els.dropzone.classList.add('busy');
+      els.dropzone.innerHTML = '<strong><span class="spinner"></span>Decoding…</strong>';
+
+      try {
+        ensureAudioCtx();
+        await audioCtx.resume();
+        const ab = await file.arrayBuffer();
+        let decoded;
+        try {
+          decoded = await audioCtx.decodeAudioData(ab.slice(0));
+        } catch (err) {
+          if (isVideoFile(file)) toast('This video codec is unsupported.', 'error');
+          else toast("Couldn't read this file. Try a different format.", 'error');
+          return;
+        }
+        if (!decoded || !decoded.length) {
+          if (isVideoFile(file)) toast('This video has no audio track.', 'error');
+          else toast("Couldn't read this file. Try a different format.", 'error');
+          return;
+        }
+        let mono = toMonoBuffer(decoded);
+        mono = normalizeRecordingBuffer(mono);
+        // Replace confirm after successful decode (PRD §19.5)
+        if (S.buffer) {
+          const ok = confirm('Replace current audio with this file? Your current clip will be discarded.');
+          if (!ok) {
+            toast('Upload cancelled');
+            return;
+          }
+        }
+        const video = isVideoFile(file);
+        setBuffer(mono, {
+          name: file.name,
+          videoFile: video ? file : null,
+          clearVideo: !video
+        });
+        toast('Loaded ' + file.name, 'ok');
+      } catch (e) {
+        console.error(e);
+        toast("Couldn't read this file. Try a different format.", 'error');
+      } finally {
+        els.dropzone.classList.remove('busy');
+        els.dropzone.innerHTML = '<strong>Drop audio or video</strong><small>WAV · MP3 · AAC · M4A · MP4 · MOV · WebM</small>';
+      }
+    }
+
+    /* =========================================================
+       Bake / export
+       ========================================================= */
+    async function renderWithFx(sourceBuf, fx) {
+      const ctxOnline = ensureAudioCtx();
+      let buf = sourceBuf;
+      if (fx.reverse) buf = reverseBuffer(buf);
+
+      const rate = Math.max(0.25, Math.min(4, (fx.speed || 1) * Math.pow(2, (fx.pitchSemi || 0) / 12)));
+      const tail = (fx.reverbMix > 0 ? (fx.reverbDecay || 0) : 0) + (fx.delayMix > 0 ? (fx.delayTime || 0) : 0) + 0.5;
+      const outDuration = buf.duration / rate + tail;
+      const frames = Math.max(1, Math.ceil(outDuration * buf.sampleRate));
+      const offline = new OfflineAudioContext(1, frames, buf.sampleRate);
+
+      const chain = buildFxChain(offline, fx, { offline: true });
+      chain.output.connect(offline.destination);
+
+      const src = offline.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate;
+      if ((fx.vibrato || 0) > 0.001) {
+        const lfo = offline.createOscillator();
+        lfo.frequency.value = fx.vibratoRate || 5;
+        const depth = offline.createGain();
+        depth.gain.value = fx.vibrato * 0.03 * rate;
+        lfo.connect(depth);
+        depth.connect(src.playbackRate);
+        lfo.start(0);
+      }
+      src.connect(chain.input);
+      src.start(0);
+
+      let rendered = await offline.startRendering();
+      rendered = toMonoBuffer(rendered);
+      rendered = applyFadesAndCrush(rendered, fx);
+      rendered = applyPeakLimiter(rendered, LIMITER_PEAK);
+      return rendered;
+    }
+
+    async function applyFxBake() {
+      if (!S.buffer || S.baking || fxEqualsDefault(S.fx)) return;
+      S.baking = true;
+      updateTransportEnabled();
+      stopPlayback(false);
+      try {
+        // Snapshot dry (or current) audio + FX *before* replacing the buffer
+        pushHistory({ includeBuffer: true });
+        const wet = await renderWithFx(S.buffer, S.fx);
+        S.buffer = wet;
+        // originalBuffer stays as ingest original — never replace here
+        S.playhead = 0;
+        S.fx = defaultFx();
+        S.presetChain = [];
+        S.activePresetId = null;
+        S.activeCustomId = null;
+        rebuildFxPanel();
+        renderPresets();
+        updateChainBar();
+        schedulePersist();
+        drawWave();
+        updateTimeChip();
+        updateUndoButtons();
+        toast('FX applied to clip. Undo restores previous audio.', 'ok');
+      } catch (e) {
+        console.error(e);
+        // Roll back the history push if bake failed (top entry is pre-bake state)
+        if (undoStack.length) undoStack.pop();
+        updateUndoButtons();
+        toast('FX render failed.', 'error');
+      } finally {
+        S.baking = false;
+        updateTransportEnabled();
+      }
+    }
+
+    function bufferToWav(buf) {
+      const numCh = 1;
+      const sr = buf.sampleRate;
+      const samples = buf.getChannelData(0);
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+      const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numCh, true);
+      view.setUint32(24, sr, true);
+      view.setUint32(28, sr * numCh * 2, true);
+      view.setUint16(32, numCh * 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++) {
+        let s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+        offset += 2;
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    async function loadLame() {
+      if (window.lamejs) return window.lamejs;
+      if (lameLoading) return lameLoading;
+      lameLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';
+        s.async = true;
+        s.onload = () => resolve(window.lamejs);
+        s.onerror = () => reject(new Error('lame load failed'));
+        document.head.appendChild(s);
+      });
+      return lameLoading;
+    }
+
+    async function exportAudio(format) {
+      if (!S.buffer || S.baking) {
+        toast('Record or upload audio first');
+        return;
+      }
+      S.baking = true;
+      updateTransportEnabled();
+      stopPlayback(false);
+      try {
+        let buf = S.buffer;
+        if (!fxEqualsDefault(S.fx)) {
+          buf = await renderWithFx(S.buffer, S.fx);
+        }
+        const ts = Date.now();
+        if (format === 'wav') {
+          const blob = bufferToWav(buf);
+          const name = 'voxclip-' + ts + '.wav';
+          downloadBlob(blob, name);
+          toast('Exported ' + name, 'ok');
+          S.lastExportFormat = 'wav';
+        } else {
+          try {
+            const lamejs = await loadLame();
+            const mp3enc = new lamejs.Mp3Encoder(1, buf.sampleRate, 192);
+            const samples = buf.getChannelData(0);
+            const block = 1152;
+            const int16 = new Int16Array(samples.length);
+            for (let i = 0; i < samples.length; i++) {
+              const s = Math.max(-1, Math.min(1, samples[i]));
+              int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            }
+            const parts = [];
+            for (let i = 0; i < int16.length; i += block) {
+              const chunk = int16.subarray(i, i + block);
+              const mp3buf = mp3enc.encodeBuffer(chunk);
+              if (mp3buf.length) parts.push(mp3buf);
+            }
+            const end = mp3enc.flush();
+            if (end.length) parts.push(end);
+            const blob = new Blob(parts, { type: 'audio/mpeg' });
+            const name = 'voxclip-' + ts + '.mp3';
+            downloadBlob(blob, name);
+            toast('Exported ' + name, 'ok');
+            S.lastExportFormat = 'mp3';
+          } catch (e) {
+            console.error(e);
+            toast("MP3 export isn't available right now — try WAV instead.", 'error');
+          }
+        }
+        schedulePersist();
+      } catch (e) {
+        console.error(e);
+        toast('Export failed.', 'error');
+      } finally {
+        S.baking = false;
+        updateTransportEnabled();
+      }
+    }
+
+    /* =========================================================
+       Presets & customs
+       ========================================================= */
+    function setPresetTab(which, persist = true) {
+      S.presetsSection = which;
+      els.tabBuiltIn.classList.toggle('active', which === 'built-in');
+      els.tabCustom.classList.toggle('active', which === 'custom');
+      els.tabBuiltIn.setAttribute('aria-selected', String(which === 'built-in'));
+      els.tabCustom.setAttribute('aria-selected', String(which === 'custom'));
+      renderPresets();
+      if (persist) schedulePersist();
+    }
+
+    function applyFxObject(fx, { presetId = null, customId = null, push = true } = {}) {
+      if (push) pushHistory();
+      S.fx = mergeFx(fx);
+      if (customId) {
+        S.presetChain = [];
+        S.activePresetId = null;
+        S.activeCustomId = customId;
+      } else if (presetId) {
+        S.presetChain = [presetId];
+        S.activePresetId = presetId;
+        S.activeCustomId = null;
+      } else {
+        S.presetChain = [];
+        S.activePresetId = null;
+        S.activeCustomId = null;
+      }
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      if (S.playing) startPlayback();
+    }
+
+    function renderPresets() {
+      els.presetGrid.innerHTML = '';
+      if (S.presetsSection === 'built-in') {
+        els.customEmpty.hidden = true;
+        els.chainBar.hidden = false;
+        // Group by category into expanders (default open)
+        const byCat = {};
+        for (const p of BUILTIN_PRESETS) {
+          const cat = p.cat || 'Other';
+          if (!byCat[cat]) byCat[cat] = [];
+          byCat[cat].push(p);
+        }
+        const cats = PRESET_CATS.filter((c) => byCat[c] && byCat[c].length);
+        for (const cat of Object.keys(byCat)) {
+          if (!cats.includes(cat)) cats.push(cat);
+        }
+        for (const cat of cats) {
+          const list = byCat[cat] || [];
+          const details = document.createElement('details');
+          details.className = 'preset-expander';
+          details.open = S.presetCatOpen[cat] !== false;
+          details.dataset.cat = cat;
+          const summary = document.createElement('summary');
+          summary.innerHTML = '<span>' + cat + '</span><span class="count">' + list.length + '</span>';
+          details.appendChild(summary);
+          const grid = document.createElement('div');
+          grid.className = 'preset-grid';
+          grid.setAttribute('role', 'list');
+          for (const p of list) {
+            const chainIdx = S.presetChain.indexOf(p.id);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className =
+              'preset-card' +
+              (chainIdx >= 0 ? ' active active-' + (chainIdx + 1) : '');
+            btn.setAttribute('role', 'listitem');
+            btn.setAttribute(
+              'aria-label',
+              p.name +
+                ' — ' +
+                p.desc +
+                (chainIdx >= 0 ? ' (chain ' + (chainIdx + 1) + ' of ' + MAX_PRESET_CHAIN + ')' : '')
+            );
+            btn.setAttribute('aria-pressed', chainIdx >= 0 ? 'true' : 'false');
+            btn.title =
+              p.desc +
+              (chainIdx >= 0
+                ? ' · chain #' + (chainIdx + 1)
+                : ' · tap to add to chain (max ' + MAX_PRESET_CHAIN + ')');
+            btn.innerHTML =
+              (chainIdx >= 0
+                ? '<span class="chain-badge" aria-hidden="true">' + (chainIdx + 1) + '</span>'
+                : '') +
+              '<span class="emoji" aria-hidden="true">' +
+              p.emoji +
+              '</span>' +
+              '<div class="name">' +
+              p.name +
+              '</div>' +
+              '<div class="desc">' +
+              p.desc +
+              '</div>';
+            btn.addEventListener('click', () => togglePresetInChain(p.id));
+            grid.appendChild(btn);
+          }
+          details.appendChild(grid);
+          details.addEventListener('toggle', () => {
+            S.presetCatOpen[cat] = details.open;
+            schedulePersist();
+          });
+          els.presetGrid.appendChild(details);
+        }
+      } else {
+        els.chainBar.hidden = true;
+        if (!S.customSettings.length) {
+          els.customEmpty.hidden = false;
+          return;
+        }
+        els.customEmpty.hidden = true;
+        const grid = document.createElement('div');
+        grid.className = 'preset-grid';
+        grid.setAttribute('role', 'list');
+        for (const c of S.customSettings) {
+          const wrap = document.createElement('div');
+          wrap.className = 'preset-card custom-actions' + (S.activeCustomId === c.id ? ' active' : '');
+          wrap.setAttribute('role', 'listitem');
+          wrap.innerHTML =
+            '<button type="button" class="btn-ghost grow load" style="text-align:left;border:none;padding:0;min-height:0">' +
+            '<div class="emoji">' + (c.emoji || '⭐') + '</div><div class="name"></div></button>' +
+            '<div class="mini-row">' +
+            '<button type="button" class="rename" aria-label="Rename">Rename</button>' +
+            '<button type="button" class="overwrite" aria-label="Overwrite with current FX">Overwrite</button>' +
+            '<button type="button" class="del btn-danger" aria-label="Delete">Delete</button></div>';
+          wrap.querySelector('.name').textContent = c.name;
+          wrap.querySelector('.load').addEventListener('click', () => {
+            applyFxObject(c.fx, { presetId: null, customId: c.id });
+            toast('Loaded “' + c.name + '”');
+          });
+          wrap.querySelector('.rename').addEventListener('click', () => renameCustom(c.id));
+          wrap.querySelector('.overwrite').addEventListener('click', () => overwriteCustom(c.id));
+          wrap.querySelector('.del').addEventListener('click', () => deleteCustom(c.id));
+          grid.appendChild(wrap);
+        }
+        els.presetGrid.appendChild(grid);
+      }
+    }
+
+    function openSaveModal() {
+      els.saveName.value = '';
+      if (S.activeCustomId) {
+        const c = S.customSettings.find((x) => x.id === S.activeCustomId);
+        if (c) els.saveName.value = c.name;
+      }
+      els.saveOverwrite.hidden = true;
+      showModal(els.saveModal);
+      setTimeout(() => els.saveName.focus(), 50);
+    }
+
+    function saveCustomFromModal(forceOverwrite) {
+      const name = (els.saveName.value || '').trim();
+      if (!name) {
+        toast('Enter a name for this setting.', 'error');
+        return;
+      }
+      if (name.length > 40) {
+        toast('Name must be 40 characters or fewer.', 'error');
+        return;
+      }
+      const existing = S.customSettings.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (existing && !forceOverwrite) {
+        els.saveOverwrite.hidden = false;
+        toast('Name already exists — overwrite or rename.');
+        return;
+      }
+      if (existing && forceOverwrite) {
+        existing.fx = { ...S.fx };
+        existing.updatedAt = Date.now();
+        S.activeCustomId = existing.id;
+        S.presetChain = [];
+        S.activePresetId = null;
+        hideModal(els.saveModal);
+        renderPresets();
+        updateChainBar();
+        schedulePersist();
+        toast('Saved “' + existing.name + '”', 'ok');
+        return;
+      }
+      if (S.customSettings.length >= MAX_CUSTOMS) {
+        toast('Limit of 50 custom settings reached. Delete one to save another.', 'error');
+        return;
+      }
+      const item = {
+        id: uid(),
+        name,
+        fx: { ...S.fx },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        emoji: '⭐'
+      };
+      S.customSettings.unshift(item);
+      S.activeCustomId = item.id;
+      S.presetChain = [];
+      S.activePresetId = null;
+      hideModal(els.saveModal);
+      setPresetTab('custom');
+      updateChainBar();
+      schedulePersist();
+      toast('Saved “' + name + '”', 'ok');
+    }
+
+    function renameCustom(id) {
+      const c = S.customSettings.find((x) => x.id === id);
+      if (!c) return;
+      const name = prompt('Rename setting', c.name);
+      if (name == null) return;
+      const n = name.trim();
+      if (!n || n.length > 40) {
+        toast('Invalid name.', 'error');
+        return;
+      }
+      if (S.customSettings.some((x) => x.id !== id && x.name.toLowerCase() === n.toLowerCase())) {
+        toast('Name already in use.', 'error');
+        return;
+      }
+      c.name = n;
+      c.updatedAt = Date.now();
+      renderPresets();
+      schedulePersist();
+    }
+
+    function overwriteCustom(id) {
+      const c = S.customSettings.find((x) => x.id === id);
+      if (!c) return;
+      if (!confirm('Overwrite “' + c.name + '” with current FX?')) return;
+      c.fx = { ...S.fx };
+      c.updatedAt = Date.now();
+      S.activeCustomId = c.id;
+      S.presetChain = [];
+      S.activePresetId = null;
+      renderPresets();
+      updateChainBar();
+      schedulePersist();
+      toast('Updated “' + c.name + '”', 'ok');
+    }
+
+    function deleteCustom(id) {
+      const c = S.customSettings.find((x) => x.id === id);
+      if (!c) return;
+      if (!confirm('Delete “' + c.name + '”? This can’t be undone.')) return;
+      S.customSettings = S.customSettings.filter((x) => x.id !== id);
+      if (S.activeCustomId === id) S.activeCustomId = null;
+      renderPresets();
+      schedulePersist();
+      toast('Deleted “' + c.name + '”');
+    }
+
+    /* =========================================================
+       FX panel
+       ========================================================= */
+    function formatFxVal(key, v, unit) {
+      if (typeof v === 'boolean') return v ? 'On' : 'Off';
+      if (unit === 'st' || unit === 'dB' || unit === '×' || unit === ':1') {
+        return (Math.round(v * 100) / 100) + (unit ? ' ' + unit : '');
+      }
+      if (unit === 'Hz' || unit === 's') return (Math.round(v * 100) / 100) + ' ' + unit;
+      return String(Math.round(v * 100) / 100);
+    }
+
+    function rebuildFxPanel() {
+      const root = els.fxPanel;
+      root.innerHTML = '';
+      for (const group of FX_META) {
+        const sec = document.createElement('div');
+        sec.className = 'fx-group';
+        sec.innerHTML = '<h3>' + group.group + '</h3>';
+        for (const p of group.params) {
+          if (p.type === 'bool') {
+            const row = document.createElement('div');
+            row.className = 'toggle-row';
+            row.innerHTML = '<span>' + p.label + '</span><label class="switch"><input type="checkbox" data-key="' + p.key + '" ' + (S.fx[p.key] ? 'checked' : '') + ' /><span></span></label>';
+            row.querySelector('input').addEventListener('change', (e) => {
+              pushHistory();
+              S.fx[p.key] = e.target.checked;
+              onFxEdited();
+            });
+            sec.appendChild(row);
+          } else {
+            const row = document.createElement('div');
+            row.className = 'fx-row';
+            const id = 'fx_' + p.key;
+            const isExternal = p.external === 'inputGain';
+            const cur = isExternal ? S.inputGain : S.fx[p.key];
+            row.innerHTML =
+              '<label for="' + id + '"><span>' + p.label + '</span><span class="val" data-val="' + p.key + '">' +
+              formatFxVal(p.key, cur, p.unit) + '</span></label>' +
+              '<input type="range" id="' + id + '" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '" value="' + cur + '" />';
+            const input = row.querySelector('input');
+            const valEl = row.querySelector('.val');
+            let gesturePushed = false;
+            const markGesture = () => {
+              if (gesturePushed) return;
+              pushHistory();
+              gesturePushed = true;
+            };
+            input.addEventListener('pointerdown', markGesture);
+            input.addEventListener('touchstart', markGesture, { passive: true });
+            input.addEventListener('keydown', (e) => {
+              if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(e.key)) {
+                markGesture();
+              }
+            });
+            const endGesture = () => { gesturePushed = false; };
+            input.addEventListener('pointerup', endGesture);
+            input.addEventListener('change', endGesture);
+            const onInput = () => {
+              const v = parseFloat(input.value);
+              if (isExternal) {
+                S.inputGain = clampNum(v, 0.5, 9, 1);
+                valEl.textContent = formatFxVal(p.key, S.inputGain, p.unit);
+                if (els.inputGain) {
+                  els.inputGain.value = String(S.inputGain);
+                  els.inputGainVal.textContent = formatGainX(S.inputGain);
+                }
+                schedulePersist();
+                if (S.playing) startPlayback();
+              } else {
+                S.fx[p.key] = v;
+                valEl.textContent = formatFxVal(p.key, v, p.unit);
+                onFxEdited(false);
+              }
+            };
+            input.addEventListener('input', onInput);
+            input.addEventListener('change', () => {
+              if (isExternal) {
+                schedulePersist();
+                if (S.playing) startPlayback();
+              } else onFxEdited(true);
+            });
+            sec.appendChild(row);
+          }
+        }
+        root.appendChild(sec);
+      }
+    }
+
+    function fxMatchesChain() {
+      if (!S.presetChain.length) return false;
+      let expected = null;
+      for (const id of S.presetChain) {
+        const p = getPresetById(id);
+        if (!p) return false;
+        expected = expected ? blendPartialOnto(expected, p.fx) : mergeFx(p.fx);
+      }
+      if (!expected) return false;
+      for (const k of Object.keys(defaultFx())) {
+        if (typeof expected[k] === 'number') {
+          if (Math.abs((S.fx[k] || 0) - expected[k]) > 0.001) return false;
+        } else if (S.fx[k] !== expected[k]) return false;
+      }
+      return true;
+    }
+
+    function onFxEdited(restart = true, opts = {}) {
+      if (opts.pushHistory) pushHistory();
+      // Manual slider drift: keep chain badges until values no longer match chain recipe
+      if (S.presetChain.length && !fxMatchesChain()) {
+        // Keep chain ids for UI context but mark as edited — clear chain highlight meaning
+        // Product: deselect chain when drifted so UI doesn't claim exact preset match
+        S.presetChain = [];
+        S.activePresetId = null;
+      }
+      if (S.activeCustomId) {
+        const c = S.customSettings.find((x) => x.id === S.activeCustomId);
+        if (c) {
+          const m = mergeFx(c.fx);
+          for (const k of Object.keys(defaultFx())) {
+            if (typeof m[k] === 'number') {
+              if (Math.abs((S.fx[k] || 0) - m[k]) > 0.001) {
+                S.activeCustomId = null;
+                break;
+              }
+            } else if (S.fx[k] !== m[k]) {
+              S.activeCustomId = null;
+              break;
+            }
+          }
+        }
+      }
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      if (restart && S.playing) startPlayback();
+    }
+
+    /**
+     * Reset FX → defaults + restore working audio to the most original
+     * (record/upload buffer). Any Apply FX bakes are discarded.
+     */
+    function resetFx() {
+      const wasPlaying = S.playing;
+      const needsAudioRestore = !!(S.originalBuffer && S.buffer && bufferIsBakedFromOriginal());
+      const needsFxReset =
+        !fxEqualsDefault(S.fx) ||
+        S.presetChain.length > 0 ||
+        !!S.activeCustomId;
+
+      if (!needsAudioRestore && !needsFxReset) {
+        toast('Already at original audio and default FX');
+        return;
+      }
+
+      // Capture current working audio + FX so Undo can bring bake/FX back
+      pushHistory({ includeBuffer: true });
+      stopPlayback(false);
+
+      if (S.originalBuffer) {
+        S.buffer = cloneBuffer(S.originalBuffer);
+        S.playhead = 0;
+        els.waveEmpty.classList.add('hidden');
+        if (S.sourceName) {
+          els.sourceMeta.textContent =
+            S.sourceName +
+            ' · mono · ' +
+            fmtTime(S.buffer.duration, false) +
+            ' · ' +
+            S.buffer.sampleRate +
+            ' Hz';
+        }
+        updateTimeChip();
+        drawWave();
+        syncVideo();
+      }
+
+      S.fx = defaultFx();
+      S.presetChain = [];
+      S.activePresetId = null;
+      S.activeCustomId = null;
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateTransportEnabled();
+      schedulePersist();
+      updateUndoButtons();
+      if (wasPlaying && S.buffer) startPlayback();
+      toast(
+        needsAudioRestore
+          ? 'Restored original audio + FX defaults'
+          : 'FX reset to defaults',
+        'ok'
+      );
+    }
+
+    /* =========================================================
+       Reset project / clear storage
+       ========================================================= */
+    function resetProject() {
+      if (!confirm('This clears your current audio and FX. Saved custom settings are kept. Continue?')) return;
+      stopPlayback(true);
+      if (S.recording) stopRecording();
+      S.buffer = null;
+      S.originalBuffer = null;
+      S.playhead = 0;
+      S.fx = defaultFx();
+      S.presetChain = [];
+      S.activePresetId = null;
+      S.activeCustomId = null;
+      S.sourceName = '';
+      clearHistory();
+      revokeVideo();
+      els.waveEmpty.classList.remove('hidden');
+      els.sourceMeta.textContent = '';
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateUndoButtons();
+      updateTransportEnabled();
+      updateTimeChip();
+      drawWave();
+      schedulePersist();
+      toast('Project reset');
+    }
+
+    function clearAllSaved() {
+      if (!confirm('Clear all saved settings, preferences, and custom voices on this device?')) return;
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+      S.customSettings = [];
+      S.fx = defaultFx();
+      S.presetChain = [];
+      S.activePresetId = null;
+      S.activeCustomId = null;
+      S.loop = false;
+      S.skipIntervalSec = 5;
+      S.lastExportFormat = 'wav';
+      S.advancedLabExpanded = false;
+      S.presetsSection = 'built-in';
+      S.presetCatOpen = Object.fromEntries(PRESET_CATS.map((c) => [c, true]));
+      S.micLevel = defaultMicLevel();
+      S.inputGain = defaultInputGain();
+      undoStack = [];
+      redoStack = [];
+      els.btnLoop.classList.remove('active-loop');
+      els.btnLoop.setAttribute('aria-pressed', 'false');
+      els.labDetails.open = false;
+      els.skipInterval.value = '5';
+      els.exportPref.value = 'wav';
+      syncGainSlidersUI();
+      setPresetTab('built-in', false);
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateUndoButtons();
+      updateTransportEnabled();
+      toast('All saved data cleared', 'ok');
+    }
+
+    /* =========================================================
+       Modals
+       ========================================================= */
+    function showModal(el) {
+      el.hidden = false;
+      el.classList.add('show');
+    }
+    function hideModal(el) {
+      el.classList.remove('show');
+      el.hidden = true;
+    }
+
+    /* =========================================================
+       Long-press skip
+       ========================================================= */
+    function bindRepeat(btn, action) {
+      const start = (e) => {
+        if (btn.disabled) return;
+        e.preventDefault();
+        action();
+        let delay = 200;
+        let started = Date.now();
+        const tick = () => {
+          action();
+          if (Date.now() - started > 1500) delay = 80;
+          longPressAccel = setTimeout(tick, delay);
+        };
+        longPressTimer = setTimeout(tick, 400);
+      };
+      const end = () => {
+        clearTimeout(longPressTimer);
+        clearTimeout(longPressAccel);
+      };
+      btn.addEventListener('pointerdown', start);
+      btn.addEventListener('pointerup', end);
+      btn.addEventListener('pointerleave', end);
+      btn.addEventListener('pointercancel', end);
+    }
+
+    /* =========================================================
+       Keyboard
+       ========================================================= */
+    function onKey(e) {
+      if (isTypingTarget(e.target)) return;
+      if (els.saveModal.classList.contains('show') || els.settingsModal.classList.contains('show')) {
+        if (e.key === 'Escape') {
+          hideModal(els.saveModal);
+          hideModal(els.settingsModal);
+          hideModal(els.moreSkipModal);
+        }
+        return;
+      }
+      const k = e.key;
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === 'z' || k === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) redoFx();
+        else undoFx();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (k === 'y' || k === 'Y')) {
+        e.preventDefault();
+        redoFx();
+        return;
+      }
+      if (k === ' ' || k === 'Spacebar') {
+        e.preventDefault();
+        togglePlay();
+      } else if (k === 'ArrowLeft' || k === 'j' || k === 'J') {
+        e.preventDefault();
+        skip(e.shiftKey ? -10 : -5);
+      } else if (k === 'ArrowRight' || k === 'l' || k === 'L') {
+        e.preventDefault();
+        skip(e.shiftKey ? 10 : 5);
+      } else if (k === ',' && S.videoMeta) {
+        e.preventDefault();
+        frameStep(-1);
+      } else if (k === '.' && S.videoMeta) {
+        e.preventDefault();
+        frameStep(1);
+      } else if (k === 'Home' || k === '0') {
+        e.preventDefault();
+        skip(-1e9);
+      } else if (k === 'End') {
+        e.preventDefault();
+        skip(1e9);
+      }
+    }
+
+    /* =========================================================
+       Network / PWA
+       ========================================================= */
+    function updateOnline() {
+      const on = navigator.onLine;
+      els.netPill.classList.toggle('online', on);
+      els.netPill.classList.toggle('offline', !on);
+      els.netPillText.textContent = on ? 'Online' : 'Offline';
+    }
+
+    function registerSW() {
+      if (!('serviceWorker' in navigator)) return;
+      // Relative registration works on GitHub Pages project sites
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+
+    /* =========================================================
+       Wire events
+       ========================================================= */
+    function wire() {
+      els.btnRecord.addEventListener('click', toggleRecord);
+      els.btnUpload.addEventListener('click', () => els.fileInput.click());
+      els.fileInput.addEventListener('change', () => {
+        const f = els.fileInput.files && els.fileInput.files[0];
+        els.fileInput.value = '';
+        if (f) loadFile(f);
+      });
+
+      // Mic level (capture) + Input gain (playback chain before FX gain)
+      const onMicLevel = () => {
+        S.micLevel = clampNum(parseFloat(els.micLevel.value), 1, 12, defaultMicLevel());
+        els.micLevelVal.textContent = formatGainX(S.micLevel);
+        if (recordGainNode && S.recording) {
+          recordGainNode.gain.value = Math.max(1, S.micLevel);
+        }
+        schedulePersist();
+      };
+      let inputGainGesture = false;
+      const onInputGain = () => {
+        S.inputGain = clampNum(parseFloat(els.inputGain.value), 0.5, 9, defaultInputGain());
+        els.inputGainVal.textContent = formatGainX(S.inputGain);
+        const labIn = document.getElementById('fx_inputGain');
+        const labVal = document.querySelector('[data-val="inputGain"]');
+        if (labIn) labIn.value = String(S.inputGain);
+        if (labVal) labVal.textContent = formatFxVal('inputGain', S.inputGain, '×');
+        schedulePersist();
+        if (S.playing) startPlayback();
+      };
+      els.micLevel.addEventListener('input', onMicLevel);
+      els.micLevel.addEventListener('change', onMicLevel);
+      els.inputGain.addEventListener('pointerdown', () => {
+        if (!inputGainGesture) { pushHistory(); inputGainGesture = true; }
+      });
+      els.inputGain.addEventListener('pointerup', () => { inputGainGesture = false; });
+      els.inputGain.addEventListener('input', onInputGain);
+      els.inputGain.addEventListener('change', onInputGain);
+
+      els.btnUndo.addEventListener('click', undoFx);
+      els.btnRedo.addEventListener('click', redoFx);
+      els.btnClearChain.addEventListener('click', () => clearPresetChain(false));
+
+      // Drop zone
+      const dz = els.dropzone;
+      dz.addEventListener('click', () => els.fileInput.click());
+      dz.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); els.fileInput.click(); }
+      });
+      ['dragenter', 'dragover'].forEach((ev) => {
+        dz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dz.classList.add('dragover');
+        });
+      });
+      ['dragleave', 'drop'].forEach((ev) => {
+        dz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dz.classList.remove('dragover');
+        });
+      });
+      dz.addEventListener('drop', (e) => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (!f) return;
+        const ok = /(\.|\/)(wav|mp3|aac|m4a|ogg|flac|webm|mp4|mov|m4v)$/i.test(f.name) ||
+          (f.type && (f.type.startsWith('audio/') || f.type.startsWith('video/')));
+        if (!ok) {
+          toast("Couldn't read this file. Try a different format.", 'error');
+          return;
+        }
+        loadFile(f);
+      });
+
+      els.btnPlay.addEventListener('click', togglePlay);
+      els.btnStop.addEventListener('click', () => stopPlayback(true));
+      els.btnLoop.addEventListener('click', () => {
+        S.loop = !S.loop;
+        els.btnLoop.classList.toggle('active-loop', S.loop);
+        els.btnLoop.setAttribute('aria-pressed', String(S.loop));
+        schedulePersist();
+      });
+      bindRepeat(els.btnSkipN5, () => skip(-5));
+      bindRepeat(els.btnSkipP5, () => skip(5));
+      bindRepeat(els.btnSkipN10, () => skip(-10));
+      bindRepeat(els.btnSkipP10, () => skip(10));
+      bindRepeat(els.btnFramePrev, () => frameStep(-1));
+      bindRepeat(els.btnFrameNext, () => frameStep(1));
+      els.btnMoreSkip.addEventListener('click', () => showModal(els.moreSkipModal));
+      els.moreSkipClose.addEventListener('click', () => hideModal(els.moreSkipModal));
+      els.btnSkipN10m.addEventListener('click', () => { skip(-10); hideModal(els.moreSkipModal); });
+      els.btnSkipP10m.addEventListener('click', () => { skip(10); hideModal(els.moreSkipModal); });
+
+      els.btnApplyFx.addEventListener('click', applyFxBake);
+      els.btnResetFx.addEventListener('click', resetFx);
+
+      els.tabBuiltIn.addEventListener('click', () => setPresetTab('built-in'));
+      els.tabCustom.addEventListener('click', () => setPresetTab('custom'));
+      els.btnSaveSettings.addEventListener('click', openSaveModal);
+      els.saveCancel.addEventListener('click', () => hideModal(els.saveModal));
+      els.saveConfirm.addEventListener('click', () => saveCustomFromModal(false));
+      els.saveOverwrite.addEventListener('click', () => saveCustomFromModal(true));
+      els.saveName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveCustomFromModal(false);
+      });
+
+      els.btnExportWav.addEventListener('click', () => exportAudio('wav'));
+      els.btnExportMp3.addEventListener('click', () => exportAudio('mp3'));
+      els.btnResetProject.addEventListener('click', resetProject);
+
+      els.btnSettings.addEventListener('click', () => {
+        els.skipInterval.value = String(S.skipIntervalSec);
+        els.exportPref.value = S.lastExportFormat;
+        if (els.fxSourceMode) els.fxSourceMode.value = S.ui.fxSourceMode || 'local';
+        if (els.fxRemoteUrl) els.fxRemoteUrl.value = S.ui.fxRemoteUrl || '';
+        if (els.fxRemoteUrlGroup) els.fxRemoteUrlGroup.hidden = (S.ui.fxSourceMode !== 'github');
+        showModal(els.settingsModal);
+      });
+      els.settingsClose.addEventListener('click', () => hideModal(els.settingsModal));
+      els.skipInterval.addEventListener('change', () => {
+        S.skipIntervalSec = parseInt(els.skipInterval.value, 10) || 5;
+        schedulePersist();
+      });
+      els.exportPref.addEventListener('change', () => {
+        S.lastExportFormat = els.exportPref.value === 'mp3' ? 'mp3' : 'wav';
+        schedulePersist();
+      });
+      if (els.fxSourceMode) {
+        els.fxSourceMode.addEventListener('change', () => {
+          S.ui.fxSourceMode = els.fxSourceMode.value;
+          if (els.fxRemoteUrlGroup) els.fxRemoteUrlGroup.hidden = (S.ui.fxSourceMode !== 'github');
+          schedulePersist();
+        });
+      }
+      if (els.fxRemoteUrl) {
+        els.fxRemoteUrl.addEventListener('input', () => {
+          S.ui.fxRemoteUrl = els.fxRemoteUrl.value;
+          schedulePersist();
+        });
+      }
+      if (els.btnReloadFx) {
+        els.btnReloadFx.addEventListener('click', () => {
+          loadFxPresetsData(false);
+        });
+      }
+      els.btnExportCustoms.addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify({ version: 3, customSettings: S.customSettings }, null, 2)], { type: 'application/json' });
+        downloadBlob(blob, 'voxclip-custom-settings.json');
+        toast('Exported custom settings', 'ok');
+      });
+      els.btnImportCustoms.addEventListener('click', () => els.importCustomsInput.click());
+      els.importCustomsInput.addEventListener('change', async () => {
+        const f = els.importCustomsInput.files && els.importCustomsInput.files[0];
+        els.importCustomsInput.value = '';
+        if (!f) return;
+        try {
+          const text = await f.text();
+          const data = JSON.parse(text);
+          const list = Array.isArray(data) ? data : data.customSettings;
+          if (!Array.isArray(list)) throw new Error('bad');
+          const mode = confirm('OK = merge into library. Cancel = replace library.') ? 'merge' : 'replace';
+          const incoming = list.slice(0, MAX_CUSTOMS).map((c) => ({
+            id: String(c.id || uid()),
+            name: String(c.name || 'Imported').slice(0, 40),
+            fx: mergeFx(c.fx),
+            createdAt: Number(c.createdAt) || Date.now(),
+            updatedAt: Number(c.updatedAt) || Date.now(),
+            emoji: c.emoji || '⭐'
+          }));
+          if (mode === 'replace') S.customSettings = incoming;
+          else {
+            for (const c of incoming) {
+              if (S.customSettings.length >= MAX_CUSTOMS) break;
+              if (S.customSettings.some((x) => x.name.toLowerCase() === c.name.toLowerCase())) {
+                c.name = c.name + ' copy';
+              }
+              c.id = uid();
+              S.customSettings.push(c);
+            }
+          }
+          renderPresets();
+          schedulePersist();
+          toast('Imported custom settings', 'ok');
+        } catch (_) {
+          toast('Invalid settings file.', 'error');
+        }
+      });
+      els.btnClearSaved.addEventListener('click', clearAllSaved);
+
+      els.labDetails.addEventListener('toggle', () => {
+        S.advancedLabExpanded = els.labDetails.open;
+        schedulePersist();
+      });
+
+      // Waveform seek — pointer events for desktop + iPad + Android
+      const wave = els.wave;
+      let seeking = false;
+      wave.addEventListener('pointerdown', (e) => {
+        seeking = true;
+        try { wave.setPointerCapture(e.pointerId); } catch (_) {}
+        seekFromEvent(e);
+      });
+      wave.addEventListener('pointermove', (e) => {
+        if (!seeking) return;
+        seekFromEvent(e);
+      });
+      const endSeek = (e) => {
+        seeking = false;
+        try { wave.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+      wave.addEventListener('pointerup', endSeek);
+      wave.addEventListener('pointercancel', endSeek);
+
+      window.addEventListener('keydown', onKey);
+      window.addEventListener('resize', () => resizeWave());
+      window.addEventListener('online', updateOnline);
+      window.addEventListener('offline', updateOnline);
+
+      // Backdrop click closes modals
+      [els.saveModal, els.settingsModal, els.moreSkipModal].forEach((m) => {
+        m.addEventListener('click', (e) => {
+          if (e.target === m) hideModal(m);
+        });
+      });
+    }
+
+    /* =========================================================
+       Boot
+       ========================================================= */
+    function boot() {
+      const p = loadPersisted();
+      applyPersisted(p);
+      loadFxPresetsData(true);
+      rebuildFxPanel();
+      syncGainSlidersUI();
+      renderPresets();
+      updateChainBar();
+      updateUndoButtons();
+      detectRecordSupport();
+      updateTransportEnabled();
+      updateTimeChip();
+      updateOnline();
+      wire();
+      resizeWave();
+      registerSW();
+
+      // Unlock audio on first gesture (iOS/iPad)
+      const unlock = () => {
+        try {
+          ensureAudioCtx();
+          audioCtx.resume();
+        } catch (_) {}
+        window.removeEventListener('pointerdown', unlock);
+        window.removeEventListener('touchstart', unlock);
+      };
+      window.addEventListener('pointerdown', unlock, { once: true });
+      window.addEventListener('touchstart', unlock, { once: true, passive: true });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+  })();
+  </script>
+</body>
+</html>
