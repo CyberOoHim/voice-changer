@@ -1,0 +1,202 @@
+{
+  "version": 1,
+  "categories": [
+    "Ages",
+    "Characters",
+    "Creatures",
+    "Devices",
+    "Spaces"
+  ],
+  "defaultFx": {
+    "pitchSemi": 0,
+    "formant": 0,
+    "reverse": false,
+    "speed": 1,
+    "fadeIn": 0,
+    "fadeOut": 0,
+    "sampleRateCrush": 0,
+    "bitcrush": 0,
+    "bpFreq": 1200,
+    "bpQ": 1,
+    "bpMix": 0,
+    "lowpass": 18000,
+    "highpass": 40,
+    "bass": 0,
+    "mid": 0,
+    "treble": 0,
+    "distortion": 0,
+    "ringFreq": 0,
+    "noiseMix": 0,
+    "reverbMix": 0,
+    "reverbSize": 0.45,
+    "reverbDecay": 1.4,
+    "delayTime": 0,
+    "delayFeedback": 0.25,
+    "delayMix": 0,
+    "chorus": 0,
+    "flanger": 0,
+    "tremolo": 0,
+    "tremoloRate": 5,
+    "vibrato": 0,
+    "vibratoRate": 5,
+    "gain": 1,
+    "compressorThresh": -18,
+    "compressorRatio": 3
+  },
+  "fxMeta": [
+    {
+      "group": "Pitch & Formant",
+      "params": [
+        { "key": "pitchSemi", "label": "Pitch", "min": -12, "max": 12, "step": 0.1, "unit": "st" },
+        { "key": "formant", "label": "Formant", "min": -12, "max": 12, "step": 0.1, "unit": "st" },
+        { "key": "reverse", "label": "Reverse", "type": "bool" }
+      ]
+    },
+    {
+      "group": "Time & Speed",
+      "params": [
+        { "key": "speed", "label": "Speed", "min": 0.5, "max": 2, "step": 0.01, "unit": "×" },
+        { "key": "fadeIn", "label": "Fade in", "min": 0, "max": 2, "step": 0.01, "unit": "s" },
+        { "key": "fadeOut", "label": "Fade out", "min": 0, "max": 2, "step": 0.01, "unit": "s" },
+        { "key": "sampleRateCrush", "label": "Sample crush", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "bitcrush", "label": "Bitcrush", "min": 0, "max": 1, "step": 0.01, "unit": "" }
+      ]
+    },
+    {
+      "group": "Filters",
+      "params": [
+        { "key": "bpFreq", "label": "Bandpass freq", "min": 100, "max": 8000, "step": 1, "unit": "Hz" },
+        { "key": "bpQ", "label": "Bandpass Q", "min": 0.2, "max": 12, "step": 0.1, "unit": "" },
+        { "key": "bpMix", "label": "Bandpass mix", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "lowpass", "label": "Lowpass", "min": 200, "max": 18000, "step": 1, "unit": "Hz" },
+        { "key": "highpass", "label": "Highpass", "min": 20, "max": 4000, "step": 1, "unit": "Hz" },
+        { "key": "bass", "label": "Bass", "min": -12, "max": 12, "step": 0.1, "unit": "dB" },
+        { "key": "mid", "label": "Mid", "min": -12, "max": 12, "step": 0.1, "unit": "dB" },
+        { "key": "treble", "label": "Treble", "min": -12, "max": 12, "step": 0.1, "unit": "dB" },
+        { "key": "distortion", "label": "Distortion", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "ringFreq", "label": "Ring mod", "min": 0, "max": 80, "step": 0.5, "unit": "Hz" },
+        { "key": "noiseMix", "label": "Noise mix", "min": 0, "max": 0.4, "step": 0.01, "unit": "" }
+      ]
+    },
+    {
+      "group": "Space",
+      "params": [
+        { "key": "reverbMix", "label": "Reverb mix", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "reverbSize", "label": "Reverb size", "min": 0.1, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "reverbDecay", "label": "Reverb decay", "min": 0.2, "max": 4, "step": 0.05, "unit": "s" },
+        { "key": "delayTime", "label": "Delay time", "min": 0, "max": 1, "step": 0.01, "unit": "s" },
+        { "key": "delayFeedback", "label": "Delay feedback", "min": 0, "max": 0.9, "step": 0.01, "unit": "" },
+        { "key": "delayMix", "label": "Delay mix", "min": 0, "max": 1, "step": 0.01, "unit": "" }
+      ]
+    },
+    {
+      "group": "Modulation",
+      "params": [
+        { "key": "chorus", "label": "Chorus", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "flanger", "label": "Flanger", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "tremolo", "label": "Tremolo", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "tremoloRate", "label": "Tremolo rate", "min": 0.5, "max": 20, "step": 0.1, "unit": "Hz" },
+        { "key": "vibrato", "label": "Vibrato", "min": 0, "max": 1, "step": 0.01, "unit": "" },
+        { "key": "vibratoRate", "label": "Vibrato rate", "min": 0.5, "max": 12, "step": 0.1, "unit": "Hz" }
+      ]
+    },
+    {
+      "group": "Dynamics",
+      "params": [
+        { "key": "inputGain", "label": "Input gain (before FX)", "min": 0.5, "max": 9, "step": 0.1, "unit": "×", "external": "inputGain" },
+        { "key": "gain", "label": "FX gain", "min": 0, "max": 3, "step": 0.01, "unit": "×" },
+        { "key": "compressorThresh", "label": "Comp thresh", "min": -60, "max": 0, "step": 1, "unit": "dB" },
+        { "key": "compressorRatio", "label": "Comp ratio", "min": 1, "max": 20, "step": 0.1, "unit": ":1" }
+      ]
+    }
+  ],
+  "presets": [
+    { "id": "baby", "cat": "Ages", "name": "Baby", "emoji": "👶", "desc": "Tiny high voice", "fx": { "pitchSemi": 10, "formant": 8, "speed": 0.95, "treble": 4, "highpass": 180, "gain": 1.05 } },
+    { "id": "toddler", "cat": "Ages", "name": "Toddler", "emoji": "🍼", "desc": "Cute & soft", "fx": { "pitchSemi": 8, "formant": 6, "speed": 0.98, "treble": 3, "highpass": 120, "vibrato": 0.12, "vibratoRate": 4.5 } },
+    { "id": "kid", "cat": "Ages", "name": "Kid", "emoji": "🧒", "desc": "Playful child", "fx": { "pitchSemi": 6, "formant": 5, "speed": 1.05, "treble": 2.5, "mid": 1 } },
+    { "id": "tween", "cat": "Ages", "name": "Tween", "emoji": "🎒", "desc": "Young teen energy", "fx": { "pitchSemi": 3.5, "formant": 2.5, "speed": 1.06, "treble": 1.5 } },
+    { "id": "teen-boy", "cat": "Ages", "name": "Teen Boy", "emoji": "👦", "desc": "Cracking mid voice", "fx": { "pitchSemi": 1.5, "formant": 0.5, "mid": 2, "tremolo": 0.08, "tremoloRate": 3.5, "highpass": 70 } },
+    { "id": "teen-girl", "cat": "Ages", "name": "Teen Girl", "emoji": "👧", "desc": "Bright teen tone", "fx": { "pitchSemi": 4, "formant": 3.5, "treble": 2.5, "mid": 1.5, "speed": 1.04 } },
+    { "id": "young-man", "cat": "Ages", "name": "Young Man", "emoji": "🧑", "desc": "Clear adult male", "fx": { "pitchSemi": -1.5, "formant": -1, "bass": 1.5, "mid": 0.5, "highpass": 60 } },
+    { "id": "young-woman", "cat": "Ages", "name": "Young Woman", "emoji": "👩", "desc": "Clear adult female", "fx": { "pitchSemi": 3, "formant": 2.5, "treble": 1.5, "highpass": 90, "gain": 1.05 } },
+    { "id": "adult-deep", "cat": "Ages", "name": "Adult Deep", "emoji": "🧔", "desc": "Warm mature male", "fx": { "pitchSemi": -4, "formant": -2.5, "bass": 3.5, "lowpass": 10000, "gain": 1.05 } },
+    { "id": "adult-bright", "cat": "Ages", "name": "Adult Bright", "emoji": "👱‍♀️", "desc": "Warm mature female", "fx": { "pitchSemi": 2.2, "formant": 1.8, "treble": 1.2, "mid": 1, "highpass": 80 } },
+    { "id": "middle-age", "cat": "Ages", "name": "Middle Age", "emoji": "👨‍💼", "desc": "Settled midrange", "fx": { "pitchSemi": -2, "formant": -1, "bass": 2, "mid": 1.5, "compressorThresh": -18, "compressorRatio": 3 } },
+    { "id": "elder", "cat": "Ages", "name": "Elder", "emoji": "🧓", "desc": "Gentle aged tone", "fx": { "pitchSemi": -2.5, "formant": -1.5, "speed": 0.92, "lowpass": 7500, "vibrato": 0.18, "vibratoRate": 3.2, "reverbMix": 0.08 } },
+    { "id": "grandma", "cat": "Ages", "name": "Grandma", "emoji": "👵", "desc": "Soft older lady", "fx": { "pitchSemi": 1.5, "formant": 1, "speed": 0.9, "lowpass": 7000, "vibrato": 0.14, "vibratoRate": 2.8, "treble": -1 } },
+    { "id": "grandpa", "cat": "Ages", "name": "Grandpa", "emoji": "👴", "desc": "Slow gravelly elder", "fx": { "pitchSemi": -5, "formant": -3, "speed": 0.88, "bass": 3, "lowpass": 6500, "distortion": 0.06 } },
+
+    { "id": "deep", "cat": "Characters", "name": "Deep", "emoji": "🎙️", "desc": "Lower pitch, warm body", "fx": { "pitchSemi": -5, "formant": -2, "bass": 4, "lowpass": 9000, "gain": 1.05 } },
+    { "id": "chipmunk", "cat": "Characters", "name": "Chipmunk", "emoji": "🐿️", "desc": "High & playful", "fx": { "pitchSemi": 7, "formant": 4, "speed": 1.05, "treble": 3 } },
+    { "id": "villain", "cat": "Characters", "name": "Villain", "emoji": "😈", "desc": "Dark villain", "fx": { "pitchSemi": -4, "formant": -3, "reverbMix": 0.28, "reverbDecay": 2.2, "delayMix": 0.12, "delayTime": 0.18, "lowpass": 7000, "bass": 3 } },
+    { "id": "hero", "cat": "Characters", "name": "Hero", "emoji": "🦸", "desc": "Bold cinematic lead", "fx": { "pitchSemi": -2, "formant": -1, "bass": 2.5, "mid": 2, "compressorThresh": -16, "compressorRatio": 4, "gain": 1.15, "reverbMix": 0.12 } },
+    { "id": "heroine", "cat": "Characters", "name": "Heroine", "emoji": "🦸‍♀️", "desc": "Bright confident lead", "fx": { "pitchSemi": 2, "formant": 1.5, "treble": 2, "mid": 1.5, "compressorThresh": -17, "compressorRatio": 3.5, "gain": 1.1 } },
+    { "id": "narrator", "cat": "Characters", "name": "Narrator", "emoji": "📖", "desc": "Documentary warm", "fx": { "pitchSemi": -2.5, "formant": -1.2, "bass": 2, "mid": 1, "lowpass": 11000, "compressorThresh": -18, "compressorRatio": 2.5, "gain": 1.08 } },
+    { "id": "news-anchor", "cat": "Characters", "name": "News Anchor", "emoji": "📰", "desc": "Clear broadcast", "fx": { "highpass": 90, "lowpass": 9000, "mid": 2, "compressorThresh": -20, "compressorRatio": 5, "gain": 1.12, "treble": 1 } },
+    { "id": "storyteller", "cat": "Characters", "name": "Storyteller", "emoji": "🧙‍♂️", "desc": "Intimate campfire", "fx": { "pitchSemi": -1.5, "reverbMix": 0.22, "reverbDecay": 1.8, "bass": 1.5, "lowpass": 9000, "gain": 0.98 } },
+    { "id": "witch", "cat": "Characters", "name": "Witch", "emoji": "🧙‍♀️", "desc": "Creaky mystic", "fx": { "pitchSemi": 2, "formant": -2, "speed": 0.94, "reverbMix": 0.3, "reverbDecay": 2.4, "tremolo": 0.12, "tremoloRate": 4, "lowpass": 8000 } },
+    { "id": "pirate", "cat": "Characters", "name": "Pirate", "emoji": "🏴‍☠️", "desc": "Rough sea dog", "fx": { "pitchSemi": -3.5, "formant": -2, "distortion": 0.2, "bass": 3, "highpass": 80, "lowpass": 7000, "mid": 1.5 } },
+    { "id": "cowboy", "cat": "Characters", "name": "Cowboy", "emoji": "🤠", "desc": "Dusty drawl", "fx": { "pitchSemi": -2, "formant": -1.5, "speed": 0.9, "highpass": 100, "lowpass": 6500, "bass": 1.5, "reverbMix": 0.1 } },
+    { "id": "opera", "cat": "Characters", "name": "Opera", "emoji": "🎭", "desc": "Hall reverb drama", "fx": { "pitchSemi": 1, "vibrato": 0.35, "vibratoRate": 5.5, "reverbMix": 0.5, "reverbSize": 0.85, "reverbDecay": 2.8, "gain": 1.1 } },
+    { "id": "whisper-soft", "cat": "Characters", "name": "Whisper", "emoji": "🤫", "desc": "Close soft speech", "fx": { "highpass": 200, "lowpass": 5500, "noiseMix": 0.06, "gain": 0.85, "treble": 2, "compressorThresh": -28, "compressorRatio": 2 } },
+    { "id": "giant", "cat": "Characters", "name": "Giant", "emoji": "🗿", "desc": "Huge slow boom", "fx": { "pitchSemi": -8, "formant": -5, "speed": 0.8, "bass": 6, "lowpass": 5500, "reverbMix": 0.25, "reverbDecay": 2.5 } },
+    { "id": "elf", "cat": "Characters", "name": "Elf", "emoji": "🧝", "desc": "Airy high fantasy", "fx": { "pitchSemi": 4, "formant": 3, "treble": 3, "chorus": 0.35, "reverbMix": 0.2, "reverbDecay": 1.6, "highpass": 120 } },
+    { "id": "dwarf", "cat": "Characters", "name": "Dwarf", "emoji": "⛏️", "desc": "Stout low grit", "fx": { "pitchSemi": -4.5, "formant": -3, "bass": 4, "distortion": 0.15, "mid": 2, "lowpass": 7000 } },
+    { "id": "fairy", "cat": "Characters", "name": "Fairy", "emoji": "🧚", "desc": "Tiny sparkle voice", "fx": { "pitchSemi": 9, "formant": 7, "speed": 1.08, "treble": 4, "chorus": 0.4, "delayMix": 0.1, "delayTime": 0.08, "highpass": 200 } },
+    { "id": "zombie", "cat": "Characters", "name": "Zombie", "emoji": "🧟", "desc": "Slow dead drone", "fx": { "pitchSemi": -6, "formant": -4, "speed": 0.78, "lowpass": 4000, "distortion": 0.18, "noiseMix": 0.05, "reverbMix": 0.15 } },
+    { "id": "vampire", "cat": "Characters", "name": "Vampire", "emoji": "🧛", "desc": "Silken menace", "fx": { "pitchSemi": -3, "formant": -2, "reverbMix": 0.2, "reverbDecay": 2, "lowpass": 8000, "bass": 2, "delayMix": 0.08, "delayTime": 0.12 } },
+    { "id": "ghost", "cat": "Characters", "name": "Ghost", "emoji": "👻", "desc": "Breathy & distant", "fx": { "highpass": 500, "reverbMix": 0.45, "reverbDecay": 2.5, "noiseMix": 0.08, "lowpass": 6000, "gain": 0.9 } },
+    { "id": "demon", "cat": "Characters", "name": "Demon", "emoji": "👿", "desc": "Infernal low growl", "fx": { "pitchSemi": -7, "formant": -5, "distortion": 0.35, "bass": 5, "lowpass": 5000, "reverbMix": 0.3, "reverbDecay": 2.8, "ringFreq": 8 } },
+    { "id": "angel", "cat": "Characters", "name": "Angel", "emoji": "😇", "desc": "Airy choir halo", "fx": { "pitchSemi": 2, "formant": 2, "chorus": 0.65, "reverbMix": 0.4, "reverbSize": 0.8, "reverbDecay": 2.6, "treble": 2, "highpass": 100 } },
+    { "id": "clown", "cat": "Characters", "name": "Clown", "emoji": "🤡", "desc": "Silly cartoon pitch", "fx": { "pitchSemi": 5, "formant": 4, "speed": 1.12, "vibrato": 0.4, "vibratoRate": 7, "treble": 3 } },
+    { "id": "mime-mute", "cat": "Characters", "name": "Muffled", "emoji": "🤐", "desc": "Behind a wall", "fx": { "lowpass": 1200, "highpass": 150, "reverbMix": 0.15, "gain": 0.9 } },
+
+    { "id": "alien", "cat": "Creatures", "name": "Alien", "emoji": "👽", "desc": "Odd formants", "fx": { "pitchSemi": 3, "formant": 8, "ringFreq": 12, "chorus": 0.4, "flanger": 0.2 } },
+    { "id": "robot", "cat": "Creatures", "name": "Robot", "emoji": "🤖", "desc": "Ring + bitcrush", "fx": { "ringFreq": 28, "bitcrush": 0.45, "sampleRateCrush": 0.35, "distortion": 0.12, "tremolo": 0.25, "tremoloRate": 8 } },
+    { "id": "cyborg", "cat": "Creatures", "name": "Cyborg", "emoji": "🦾", "desc": "Half-human machine", "fx": { "pitchSemi": -1, "ringFreq": 18, "bitcrush": 0.2, "sampleRateCrush": 0.15, "chorus": 0.2, "mid": 1.5 } },
+    { "id": "android", "cat": "Creatures", "name": "Android", "emoji": "🛰️", "desc": "Clean synthetic", "fx": { "pitchSemi": 0.5, "formant": -3, "bitcrush": 0.12, "highpass": 120, "lowpass": 9000, "tremolo": 0.1, "tremoloRate": 6 } },
+    { "id": "monster", "cat": "Creatures", "name": "Monster", "emoji": "👹", "desc": "Big scary rumble", "fx": { "pitchSemi": -9, "formant": -6, "bass": 6, "distortion": 0.4, "lowpass": 4500, "reverbMix": 0.2 } },
+    { "id": "dragon", "cat": "Creatures", "name": "Dragon", "emoji": "🐉", "desc": "Roaring beast", "fx": { "pitchSemi": -6, "formant": -4, "distortion": 0.45, "bass": 5, "reverbMix": 0.35, "reverbDecay": 2.2, "lowpass": 6000 } },
+    { "id": "goblin", "cat": "Creatures", "name": "Goblin", "emoji": "👺", "desc": "Nasal mischief", "fx": { "pitchSemi": 5, "formant": -3, "bpMix": 0.55, "bpFreq": 1600, "bpQ": 2.5, "speed": 1.1, "distortion": 0.1 } },
+    { "id": "orc", "cat": "Creatures", "name": "Orc", "emoji": "🗡️", "desc": "Guttural war cry", "fx": { "pitchSemi": -5, "formant": -4, "distortion": 0.3, "bass": 4, "mid": 2, "lowpass": 5500 } },
+    { "id": "squirrel", "cat": "Creatures", "name": "Squirrel", "emoji": "🐹", "desc": "Tiny chatter", "fx": { "pitchSemi": 11, "formant": 9, "speed": 1.2, "treble": 5, "highpass": 250 } },
+    { "id": "cat", "cat": "Creatures", "name": "Cat", "emoji": "🐱", "desc": "Soft meow-ish", "fx": { "pitchSemi": 5, "formant": 4, "vibrato": 0.25, "vibratoRate": 6, "treble": 2, "highpass": 150 } },
+    { "id": "dog", "cat": "Creatures", "name": "Dog", "emoji": "🐶", "desc": "Friendly bark tone", "fx": { "pitchSemi": 2, "formant": -1, "mid": 3, "distortion": 0.08, "highpass": 100 } },
+    { "id": "bird", "cat": "Creatures", "name": "Bird", "emoji": "🐦", "desc": "Chirpy high", "fx": { "pitchSemi": 10, "formant": 8, "speed": 1.15, "treble": 5, "vibrato": 0.3, "vibratoRate": 9, "highpass": 300 } },
+    { "id": "frog", "cat": "Creatures", "name": "Frog", "emoji": "🐸", "desc": "Gulpy croak", "fx": { "pitchSemi": -3, "formant": 4, "ringFreq": 6, "lowpass": 3500, "bass": 3, "speed": 0.95 } },
+    { "id": "bee", "cat": "Creatures", "name": "Bee", "emoji": "🐝", "desc": "Buzzy wings", "fx": { "pitchSemi": 4, "ringFreq": 45, "tremolo": 0.5, "tremoloRate": 18, "highpass": 200, "treble": 2 } },
+    { "id": "whale", "cat": "Creatures", "name": "Whale", "emoji": "🐋", "desc": "Deep ocean song", "fx": { "pitchSemi": -7, "formant": -3, "speed": 0.7, "reverbMix": 0.55, "reverbSize": 0.95, "reverbDecay": 3.5, "lowpass": 4000, "bass": 4 } },
+
+    { "id": "radio", "cat": "Devices", "name": "Radio", "emoji": "📻", "desc": "AM bandpass crunch", "fx": { "bpMix": 0.85, "bpFreq": 1800, "bpQ": 2.2, "highpass": 300, "lowpass": 3400, "distortion": 0.18, "compressorThresh": -22, "compressorRatio": 6, "gain": 1.15 } },
+    { "id": "telephone", "cat": "Devices", "name": "Telephone", "emoji": "📞", "desc": "Narrow band", "fx": { "highpass": 400, "lowpass": 2800, "bpMix": 0.5, "bpFreq": 1400, "bpQ": 1.4, "distortion": 0.1 } },
+    { "id": "megaphone", "cat": "Devices", "name": "Megaphone", "emoji": "📢", "desc": "Loud mid push", "fx": { "mid": 6, "highpass": 250, "lowpass": 5000, "distortion": 0.35, "compressorRatio": 8, "compressorThresh": -20, "gain": 1.2 } },
+    { "id": "walkie", "cat": "Devices", "name": "Walkie-Talkie", "emoji": "📟", "desc": "Static radio handset", "fx": { "highpass": 350, "lowpass": 3200, "bpMix": 0.4, "bpFreq": 1700, "distortion": 0.22, "noiseMix": 0.05, "sampleRateCrush": 0.15, "gain": 1.1 } },
+    { "id": "intercom", "cat": "Devices", "name": "Intercom", "emoji": "🔔", "desc": "Building speaker", "fx": { "highpass": 280, "lowpass": 4000, "mid": 3, "distortion": 0.12, "compressorRatio": 6, "compressorThresh": -20 } },
+    { "id": "pa-system", "cat": "Devices", "name": "PA System", "emoji": "🔊", "desc": "Gym hall boom", "fx": { "mid": 4, "highpass": 150, "reverbMix": 0.25, "reverbDecay": 1.6, "compressorRatio": 5, "compressorThresh": -18, "gain": 1.15 } },
+    { "id": "headphones", "cat": "Devices", "name": "Close Mic", "emoji": "🎧", "desc": "Studio proximity", "fx": { "bass": 2.5, "highpass": 50, "lowpass": 14000, "compressorThresh": -16, "compressorRatio": 3, "gain": 1.08 } },
+    { "id": "cassette", "cat": "Devices", "name": "Cassette", "emoji": "📼", "desc": "Tape wobble", "fx": { "sampleRateCrush": 0.35, "bitcrush": 0.2, "highpass": 100, "lowpass": 7000, "chorus": 0.2, "vibrato": 0.12, "vibratoRate": 2.5, "noiseMix": 0.03 } },
+    { "id": "lofi", "cat": "Devices", "name": "Lo-Fi", "emoji": "💽", "desc": "Tape crush", "fx": { "sampleRateCrush": 0.4, "bitcrush": 0.25, "highpass": 120, "lowpass": 6500, "noiseMix": 0.04, "chorus": 0.15 } },
+    { "id": "vinyl", "cat": "Devices", "name": "Vinyl", "emoji": "💿", "desc": "Warm crackle vibe", "fx": { "highpass": 60, "lowpass": 9000, "bass": 1.5, "treble": -1, "noiseMix": 0.035, "chorus": 0.1, "sampleRateCrush": 0.08 } },
+    { "id": "tv-old", "cat": "Devices", "name": "Old TV", "emoji": "📺", "desc": "CRT speaker box", "fx": { "highpass": 200, "lowpass": 4500, "mid": 3, "distortion": 0.15, "sampleRateCrush": 0.12, "noiseMix": 0.02 } },
+    { "id": "smartphone", "cat": "Devices", "name": "Smartphone", "emoji": "📱", "desc": "Phone mic thin", "fx": { "highpass": 180, "lowpass": 7500, "mid": 2, "treble": 1.5, "compressorRatio": 4, "compressorThresh": -22 } },
+    { "id": "drive-thru", "cat": "Devices", "name": "Drive-Thru", "emoji": "🍔", "desc": "Speaker post", "fx": { "highpass": 300, "lowpass": 3800, "mid": 4, "distortion": 0.28, "noiseMix": 0.04, "gain": 1.1 } },
+    { "id": "space-radio", "cat": "Devices", "name": "Space Radio", "emoji": "📡", "desc": "Distant comms", "fx": { "highpass": 400, "lowpass": 3600, "delayMix": 0.2, "delayTime": 0.22, "delayFeedback": 0.35, "reverbMix": 0.25, "noiseMix": 0.06, "bitcrush": 0.15 } },
+
+    { "id": "cave", "cat": "Spaces", "name": "Cave", "emoji": "🕳️", "desc": "Huge space", "fx": { "reverbMix": 0.55, "reverbSize": 0.9, "reverbDecay": 3.2, "delayMix": 0.15, "delayTime": 0.28, "delayFeedback": 0.35, "lowpass": 8000 } },
+    { "id": "underwater", "cat": "Spaces", "name": "Underwater", "emoji": "🌊", "desc": "Muffled depths", "fx": { "lowpass": 900, "reverbMix": 0.35, "reverbSize": 0.7, "bass": 3, "highpass": 60 } },
+    { "id": "cathedral", "cat": "Spaces", "name": "Cathedral", "emoji": "⛪", "desc": "Long sacred hall", "fx": { "reverbMix": 0.6, "reverbSize": 0.95, "reverbDecay": 3.8, "highpass": 80, "lowpass": 10000, "gain": 0.95 } },
+    { "id": "bathroom", "cat": "Spaces", "name": "Bathroom", "emoji": "🚿", "desc": "Tile bounce", "fx": { "reverbMix": 0.4, "reverbSize": 0.35, "reverbDecay": 0.9, "highpass": 150, "treble": 2, "mid": 1 } },
+    { "id": "stadium", "cat": "Spaces", "name": "Stadium", "emoji": "🏟️", "desc": "Crowd echo", "fx": { "reverbMix": 0.45, "reverbSize": 0.9, "reverbDecay": 2.8, "delayMix": 0.18, "delayTime": 0.35, "delayFeedback": 0.25, "highpass": 100 } },
+    { "id": "tunnel", "cat": "Spaces", "name": "Tunnel", "emoji": "🚇", "desc": "Long tube echo", "fx": { "reverbMix": 0.35, "reverbDecay": 2.2, "delayMix": 0.3, "delayTime": 0.18, "delayFeedback": 0.45, "lowpass": 7000 } },
+    { "id": "forest", "cat": "Spaces", "name": "Forest", "emoji": "🌲", "desc": "Outdoor airy", "fx": { "reverbMix": 0.28, "reverbSize": 0.7, "reverbDecay": 1.8, "highpass": 120, "treble": 1.5, "chorus": 0.1 } },
+    { "id": "slowmo", "cat": "Spaces", "name": "Slow-Mo", "emoji": "🐢", "desc": "Half speed vibe", "fx": { "speed": 0.75, "pitchSemi": -2, "reverbMix": 0.15 } },
+    { "id": "fasttalk", "cat": "Spaces", "name": "Fast Talk", "emoji": "⚡", "desc": "Quick & bright", "fx": { "speed": 1.25, "pitchSemi": 1, "treble": 2 } },
+    { "id": "reverse-vibe", "cat": "Spaces", "name": "Reverse", "emoji": "↩️", "desc": "Backwards speech", "fx": { "reverse": true, "reverbMix": 0.2, "reverbDecay": 1.5 } },
+    { "id": "chorus-vox", "cat": "Spaces", "name": "Chorus Vox", "emoji": "🎶", "desc": "Wide doubles", "fx": { "chorus": 0.7, "delayMix": 0.08, "delayTime": 0.03, "vibrato": 0.15, "vibratoRate": 4 } },
+    { "id": "flanger-vox", "cat": "Spaces", "name": "Flanger", "emoji": "🌀", "desc": "Jet sweep voice", "fx": { "flanger": 0.75, "chorus": 0.2, "highpass": 80 } },
+    { "id": "tremolo-vox", "cat": "Spaces", "name": "Tremolo", "emoji": "📳", "desc": "Amplitude pulse", "fx": { "tremolo": 0.7, "tremoloRate": 7, "mid": 1 } },
+    { "id": "clean-boost", "cat": "Spaces", "name": "Clean Boost", "emoji": "✨", "desc": "Louder & clear", "fx": { "gain": 1.25, "compressorThresh": -16, "compressorRatio": 3, "highpass": 80, "treble": 1.5, "bass": 1 } },
+    { "id": "helium", "cat": "Spaces", "name": "Helium", "emoji": "🎈", "desc": "Party balloon voice", "fx": { "pitchSemi": 8, "formant": 6, "treble": 3, "speed": 1.05 } },
+    { "id": "sulfur", "cat": "Spaces", "name": "Sulfur", "emoji": "🧪", "desc": "Deep gas joke", "fx": { "pitchSemi": -8, "formant": -6, "bass": 5, "lowpass": 7000 } }
+  ]
+}
