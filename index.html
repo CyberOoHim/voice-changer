@@ -857,6 +857,16 @@
       </div>
     </section>
 
+    <!-- EXPORT -->
+    <section class="card" aria-labelledby="exportTitle">
+      <h2 id="exportTitle">Export</h2>
+      <div class="export-row">
+        <button type="button" id="btnExportWav" class="btn-primary" disabled aria-label="Export WAV">Export WAV</button>
+        <button type="button" id="btnExportMp3" disabled aria-label="Export MP3">Export MP3</button>
+        <button type="button" id="btnResetProject" class="btn-danger" aria-label="Reset project">Reset Project</button>
+      </div>
+    </section>
+
     <!-- PRESETS -->
     <section class="card" aria-labelledby="presetTitle">
       <div class="row spread" style="margin-bottom:4px">
@@ -889,16 +899,9 @@
       </details>
     </section>
 
-    <!-- EXPORT -->
-    <section class="card" aria-labelledby="exportTitle">
-      <h2 id="exportTitle">Export</h2>
-      <div class="export-row">
-        <button type="button" id="btnExportWav" class="btn-primary" disabled aria-label="Export WAV">Export WAV</button>
-        <button type="button" id="btnExportMp3" disabled aria-label="Export MP3">Export MP3</button>
-        <button type="button" id="btnResetProject" class="btn-danger" aria-label="Reset project">Reset Project</button>
-      </div>
-      <p class="footer-note">All processing stays on your device. Audio is never uploaded.</p>
-    </section>
+    <footer class="app-footer" style="margin-top:20px;text-align:center;">
+      <p class="footer-note" style="margin:0;">🔒 All processing stays on your device. Audio is never uploaded.</p>
+    </footer>
   </div>
 
   <div id="toasts" aria-live="polite" aria-relevant="additions"></div>
@@ -979,6 +982,30 @@
       </div>
       <div class="modal-actions" style="margin-top:12px">
         <button type="button" id="moreSkipClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Audio confirmation modal -->
+  <div id="resetAudioModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="resetAudioTitle" hidden>
+    <div class="modal">
+      <h3 id="resetAudioTitle">Reset Audio?</h3>
+      <p>This will clear your current audio recording or upload. Your FX settings will be preserved.</p>
+      <div class="modal-actions">
+        <button type="button" id="resetAudioCancel">Cancel</button>
+        <button type="button" id="resetAudioConfirm" class="btn-danger">Reset Audio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Project confirmation modal -->
+  <div id="resetProjectModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="resetProjectTitle" hidden>
+    <div class="modal">
+      <h3 id="resetProjectTitle">Reset Project?</h3>
+      <p>This will clear your current audio clip and reset all FX parameters to defaults. Saved custom settings are kept.</p>
+      <div class="modal-actions">
+        <button type="button" id="resetProjectCancel">Cancel</button>
+        <button type="button" id="resetProjectConfirm" class="btn-danger">Reset Project</button>
       </div>
     </div>
   </div>
@@ -1434,7 +1461,13 @@
       moreSkipModal: $('moreSkipModal'),
       moreSkipClose: $('moreSkipClose'),
       btnSkipN10m: $('btnSkipN10m'),
-      btnSkipP10m: $('btnSkipP10m')
+      btnSkipP10m: $('btnSkipP10m'),
+      resetAudioModal: $('resetAudioModal'),
+      resetAudioCancel: $('resetAudioCancel'),
+      resetAudioConfirm: $('resetAudioConfirm'),
+      resetProjectModal: $('resetProjectModal'),
+      resetProjectCancel: $('resetProjectCancel'),
+      resetProjectConfirm: $('resetProjectConfirm')
     };
 
     /* =========================================================
@@ -3913,7 +3946,6 @@
        Reset project / clear storage
        ========================================================= */
     function resetProject() {
-      if (!confirm('This clears your current audio and FX. Saved custom settings are kept. Continue?')) return;
       stopPlayback(true);
       if (S.recording) stopRecording();
       S.buffer = null;
@@ -4016,11 +4048,19 @@
        ========================================================= */
     function onKey(e) {
       if (isTypingTarget(e.target)) return;
-      if (els.saveModal.classList.contains('show') || els.settingsModal.classList.contains('show')) {
+      if (
+        els.saveModal.classList.contains('show') ||
+        els.settingsModal.classList.contains('show') ||
+        els.moreSkipModal.classList.contains('show') ||
+        els.resetAudioModal.classList.contains('show') ||
+        els.resetProjectModal.classList.contains('show')
+      ) {
         if (e.key === 'Escape') {
           hideModal(els.saveModal);
           hideModal(els.settingsModal);
           hideModal(els.moreSkipModal);
+          hideModal(els.resetAudioModal);
+          hideModal(els.resetProjectModal);
         }
         return;
       }
@@ -4185,7 +4225,18 @@
 
       els.btnApplyFx.addEventListener('click', applyFxBake);
       els.btnResetFx.addEventListener('click', resetFx);
-      els.btnResetAudio.addEventListener('click', resetAudio);
+      els.btnResetAudio.addEventListener('click', () => {
+        if (!S.buffer && !S.originalBuffer) {
+          toast('No audio to reset');
+          return;
+        }
+        showModal(els.resetAudioModal);
+      });
+      els.resetAudioCancel.addEventListener('click', () => hideModal(els.resetAudioModal));
+      els.resetAudioConfirm.addEventListener('click', () => {
+        hideModal(els.resetAudioModal);
+        resetAudio();
+      });
 
       els.tabBuiltIn.addEventListener('click', () => setPresetTab('built-in'));
       els.tabCustom.addEventListener('click', () => setPresetTab('custom'));
@@ -4199,7 +4250,14 @@
 
       els.btnExportWav.addEventListener('click', () => exportAudio('wav'));
       els.btnExportMp3.addEventListener('click', () => exportAudio('mp3'));
-      els.btnResetProject.addEventListener('click', resetProject);
+      els.btnResetProject.addEventListener('click', () => {
+        showModal(els.resetProjectModal);
+      });
+      els.resetProjectCancel.addEventListener('click', () => hideModal(els.resetProjectModal));
+      els.resetProjectConfirm.addEventListener('click', () => {
+        hideModal(els.resetProjectModal);
+        resetProject();
+      });
 
       els.btnSettings.addEventListener('click', () => {
         els.skipInterval.value = String(S.skipIntervalSec);
