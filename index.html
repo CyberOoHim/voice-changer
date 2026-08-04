@@ -517,6 +517,43 @@
       padding: 0.25rem 0.45rem;
       font-size: .72rem;
     }
+    .preset-card .desc.chain-info {
+      font-size: .72rem;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.35;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .preset-card .desc.chain-info .chain-label {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: .68rem;
+    }
+    .preset-card .desc.chain-info .chain-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: #7dd3fc;
+      border-radius: 6px;
+      padding: 1px 6px;
+      font-size: .68rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .preset-card .desc.chain-info .chain-arrow {
+      color: var(--muted);
+      font-size: .65rem;
+    }
+    .preset-card .desc.chain-info .muted-text {
+      color: var(--muted);
+      font-style: italic;
+      font-size: .7rem;
+    }
     .empty-customs {
       color: var(--muted);
       font-size: .9rem;
@@ -968,7 +1005,7 @@
      *   presetChain: string[]  // up to 3 built-in preset ids, click order
      *   activePresetId: string|null  // legacy mirror of last chain id
      *   activeCustomId: string|null,
-     *   customSettings: [{ id, name, fx, createdAt, updatedAt, emoji? }],
+     *   customSettings: [{ id, name, fx, presetChain?, createdAt, updatedAt, emoji? }],
      *   updatedAt: number
      * }
      * NOT stored: audio buffers, undo/redo stacks, playhead, video blobs.
@@ -1539,6 +1576,9 @@
               id: String(c.id || uid()),
               name: String(c.name || 'Untitled').slice(0, 40),
               fx: mergeFx(c.fx),
+              presetChain: sanitizePresetChain(
+                Array.isArray(c.presetChain) ? c.presetChain : (c.presetId ? [c.presetId] : [])
+              ),
               createdAt: Number(c.createdAt) || Date.now(),
               updatedAt: Number(c.updatedAt) || Date.now(),
               emoji: c.emoji || '⭐'
@@ -1828,6 +1868,25 @@
     /* =========================================================
        Preset chain (up to 3) → Advanced Lab sliders
        ========================================================= */
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    function getPresetChainItems(chainArr) {
+      const sanitized = sanitizePresetChain(chainArr);
+      return sanitized.map((id) => {
+        const p = getPresetById(id);
+        return {
+          id,
+          name: p ? p.name : id,
+          emoji: p ? p.emoji : '',
+          fullName: p ? (p.emoji ? p.emoji + ' ' + p.name : p.name) : id
+        };
+      });
+    }
+
     function getPresetById(id) {
       return BUILTIN_PRESETS.find((p) => p.id === id) || null;
     }
@@ -3299,20 +3358,20 @@
       if (persist) schedulePersist();
     }
 
-    function applyFxObject(fx, { presetId = null, customId = null, push = true } = {}) {
+    function applyFxObject(fx, { presetId = null, customId = null, presetChain = null, push = true } = {}) {
       if (push) pushHistory();
       S.fx = mergeFx(fx);
       if (customId) {
-        S.presetChain = [];
-        S.activePresetId = null;
+        S.presetChain = sanitizePresetChain(presetChain !== null ? presetChain : []);
+        S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
         S.activeCustomId = customId;
       } else if (presetId) {
         S.presetChain = [presetId];
         S.activePresetId = presetId;
         S.activeCustomId = null;
       } else {
-        S.presetChain = [];
-        S.activePresetId = null;
+        S.presetChain = sanitizePresetChain(presetChain !== null ? presetChain : []);
+        S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
         S.activeCustomId = null;
       }
       rebuildFxPanel();
@@ -3406,24 +3465,56 @@
         grid.className = 'preset-grid';
         grid.setAttribute('role', 'list');
         for (const c of S.customSettings) {
+          const chainItems = getPresetChainItems(c.presetChain);
+          let chainDescText = '';
+          let chainDescHtml = '';
+          if (chainItems.length > 0) {
+            const chainStr = chainItems.map((i) => i.fullName).join(' → ');
+            chainDescText = chainItems.length > 1 ? 'Chain: ' + chainStr : 'Preset: ' + chainStr;
+            const chainTags = chainItems
+              .map((i) => `<span class="chain-tag">${escapeHtml(i.fullName)}</span>`)
+              .join('<span class="chain-arrow">→</span>');
+            chainDescHtml = `<span class="chain-label">${chainItems.length > 1 ? 'Chain:' : 'Preset:'}</span> ${chainTags}`;
+          } else {
+            chainDescText = 'Manual sliders';
+            chainDescHtml = '<span class="muted-text">Manual sliders</span>';
+          }
+
           const wrap = document.createElement('div');
           wrap.className = 'preset-card custom-actions' + (S.activeCustomId === c.id ? ' active' : '');
           wrap.setAttribute('role', 'listitem');
-          wrap.innerHTML =
-            '<button type="button" class="btn-ghost grow load" style="text-align:left;border:none;padding:0;min-height:0">' +
-            '<div class="emoji">' + (c.emoji || '⭐') + '</div><div class="name"></div></button>' +
-            '<div class="mini-row">' +
-            '<button type="button" class="rename" aria-label="Rename">Rename</button>' +
-            '<button type="button" class="overwrite" aria-label="Overwrite with current FX">Overwrite</button>' +
-            '<button type="button" class="del btn-danger" aria-label="Delete">Delete</button></div>';
-          wrap.querySelector('.name').textContent = c.name;
-          wrap.querySelector('.load').addEventListener('click', () => {
-            applyFxObject(c.fx, { presetId: null, customId: c.id });
+
+          const loadBtn = document.createElement('button');
+          loadBtn.type = 'button';
+          loadBtn.className = 'btn-ghost grow load';
+          loadBtn.style.cssText = 'text-align:left;border:none;padding:0;min-height:0;width:100%;';
+          loadBtn.setAttribute('aria-label', 'Load setting: ' + c.name + ' (' + chainDescText + ')');
+          loadBtn.title = c.name + ' · ' + chainDescText;
+
+          loadBtn.innerHTML =
+            '<div class="emoji">' + escapeHtml(c.emoji || '⭐') + '</div>' +
+            '<div class="name"></div>' +
+            '<div class="desc chain-info">' + chainDescHtml + '</div>';
+
+          loadBtn.querySelector('.name').textContent = c.name;
+          loadBtn.addEventListener('click', () => {
+            applyFxObject(c.fx, { presetId: null, customId: c.id, presetChain: c.presetChain });
             toast('Loaded “' + c.name + '”');
           });
-          wrap.querySelector('.rename').addEventListener('click', () => renameCustom(c.id));
-          wrap.querySelector('.overwrite').addEventListener('click', () => overwriteCustom(c.id));
-          wrap.querySelector('.del').addEventListener('click', () => deleteCustom(c.id));
+
+          const miniRow = document.createElement('div');
+          miniRow.className = 'mini-row';
+          miniRow.innerHTML =
+            '<button type="button" class="rename" aria-label="Rename">Rename</button>' +
+            '<button type="button" class="overwrite" aria-label="Overwrite with current FX">Overwrite</button>' +
+            '<button type="button" class="del btn-danger" aria-label="Delete">Delete</button>';
+
+          miniRow.querySelector('.rename').addEventListener('click', () => renameCustom(c.id));
+          miniRow.querySelector('.overwrite').addEventListener('click', () => overwriteCustom(c.id));
+          miniRow.querySelector('.del').addEventListener('click', () => deleteCustom(c.id));
+
+          wrap.appendChild(loadBtn);
+          wrap.appendChild(miniRow);
           grid.appendChild(wrap);
         }
         els.presetGrid.appendChild(grid);
@@ -3457,12 +3548,13 @@
         toast('Name already exists — overwrite or rename.');
         return;
       }
+      const chain = sanitizePresetChain(S.presetChain);
       if (existing && forceOverwrite) {
         existing.fx = { ...S.fx };
+        existing.presetChain = chain;
         existing.updatedAt = Date.now();
         S.activeCustomId = existing.id;
-        S.presetChain = [];
-        S.activePresetId = null;
+        S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
         hideModal(els.saveModal);
         renderPresets();
         updateChainBar();
@@ -3478,14 +3570,14 @@
         id: uid(),
         name,
         fx: { ...S.fx },
+        presetChain: chain,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         emoji: '⭐'
       };
       S.customSettings.unshift(item);
       S.activeCustomId = item.id;
-      S.presetChain = [];
-      S.activePresetId = null;
+      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
       hideModal(els.saveModal);
       setPresetTab('custom');
       updateChainBar();
@@ -3518,10 +3610,10 @@
       if (!c) return;
       if (!confirm('Overwrite “' + c.name + '” with current FX?')) return;
       c.fx = { ...S.fx };
+      c.presetChain = sanitizePresetChain(S.presetChain);
       c.updatedAt = Date.now();
       S.activeCustomId = c.id;
-      S.presetChain = [];
-      S.activePresetId = null;
+      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
       renderPresets();
       updateChainBar();
       schedulePersist();
@@ -4110,6 +4202,9 @@
             id: String(c.id || uid()),
             name: String(c.name || 'Imported').slice(0, 40),
             fx: mergeFx(c.fx),
+            presetChain: sanitizePresetChain(
+              Array.isArray(c.presetChain) ? c.presetChain : (c.presetId ? [c.presetId] : [])
+            ),
             createdAt: Number(c.createdAt) || Date.now(),
             updatedAt: Number(c.updatedAt) || Date.now(),
             emoji: c.emoji || '⭐'
