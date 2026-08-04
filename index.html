@@ -1344,7 +1344,8 @@
     let recordAnalyser = null;
     let recordMeterRaf = 0;
     let recordGainNode = null;
-    let recordSilentGain = null;
+    let recordScriptNode = null;
+    let recordPeakFromScript = 0;
     let recordDest = null;
     let recordUsedLiveGain = false;
     let meterSmoothPeak = 0;
@@ -2927,13 +2928,24 @@
       srcNode.connect(recordGainNode);
       recordGainNode.connect(recordAnalyser);
 
-      // Connect analyser to audioCtx.destination via 0-gain node so Web Audio
-      // hardware clock pulls samples continuously on Android Chrome & iOS Safari
+      // ScriptProcessorNode forces the audio engine to pull and process mic
+      // samples on every platform — iPad Safari, Android Chrome, iOS Safari.
+      // Safari's AnalyserNode doesn't get driven from MediaStreamSource alone;
+      // the ScriptProcessor callback gives us reliable peak data everywhere.
       try {
-        recordSilentGain = audioCtx.createGain();
-        recordSilentGain.gain.value = 0;
-        recordAnalyser.connect(recordSilentGain);
-        recordSilentGain.connect(audioCtx.destination);
+        recordScriptNode = audioCtx.createScriptProcessor(2048, 1, 1);
+        recordScriptNode.onaudioprocess = function(e) {
+          const input = e.inputBuffer.getChannelData(0);
+          let pk = 0;
+          for (let i = 0; i < input.length; i++) {
+            const a = Math.abs(input[i]);
+            if (a > pk) pk = a;
+          }
+          recordPeakFromScript = pk;
+          // Output buffer defaults to zeros — no speaker feedback
+        };
+        recordGainNode.connect(recordScriptNode);
+        recordScriptNode.connect(audioCtx.destination);
       } catch (_) {}
 
       let recordStream = mediaStream;
@@ -2988,7 +3000,7 @@
     }
 
     function meterTick() {
-      if (!S.recording || !recordAnalyser) return;
+      if (!S.recording) return;
       // Keep live mic gain in sync if user moves slider mid-record
       if (recordGainNode) {
         recordGainNode.gain.value = Math.max(1, S.micLevel || 1);
@@ -2996,13 +3008,19 @@
       if (audioCtx && audioCtx.state === 'suspended') {
         audioCtx.resume().catch(() => {});
       }
-      const data = new Uint8Array(recordAnalyser.fftSize);
-      recordAnalyser.getByteTimeDomainData(data);
-      let peak = 0;
-      for (let i = 0; i < data.length; i++) {
-        const v = Math.abs(data[i] - 128) / 128;
-        if (v > peak) peak = v;
+
+      // Prefer ScriptProcessorNode peak (works on all platforms inc. iPad Safari);
+      // fall back to AnalyserNode on platforms where ScriptProcessor wasn't created
+      let peak = recordPeakFromScript;
+      if (peak < 0.0001 && recordAnalyser) {
+        const data = new Uint8Array(recordAnalyser.fftSize);
+        recordAnalyser.getByteTimeDomainData(data);
+        for (let i = 0; i < data.length; i++) {
+          const v = Math.abs(data[i] - 128) / 128;
+          if (v > peak) peak = v;
+        }
       }
+
       // Meter already after gain node when live boost is active
       const visualBoost = recordUsedLiveGain ? 1 : Math.min(4, S.micLevel || 1);
       const effectivePeak = Math.min(1, peak * visualBoost);
@@ -3051,11 +3069,12 @@
         mediaStream = null;
       }
       try { if (recordGainNode) recordGainNode.disconnect(); } catch (_) {}
-      try { if (recordSilentGain) recordSilentGain.disconnect(); } catch (_) {}
+      try { if (recordScriptNode) { recordScriptNode.onaudioprocess = null; recordScriptNode.disconnect(); } } catch (_) {}
       try { if (recordDest) recordDest.disconnect(); } catch (_) {}
       recordAnalyser = null;
       recordGainNode = null;
-      recordSilentGain = null;
+      recordScriptNode = null;
+      recordPeakFromScript = 0;
       recordDest = null;
       meterSmoothPeak = 0;
 
