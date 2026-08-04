@@ -194,7 +194,7 @@
       height: 100%;
       width: 0%;
       background: linear-gradient(90deg, #22d3ee, #34d399 55%, #fbbf24 82%, #f43f5e);
-      transition: width .06s linear;
+      will-change: width;
     }
     .rec-timer {
       font-variant-numeric: tabular-nums;
@@ -1344,8 +1344,10 @@
     let recordAnalyser = null;
     let recordMeterRaf = 0;
     let recordGainNode = null;
+    let recordSilentGain = null;
     let recordDest = null;
     let recordUsedLiveGain = false;
+    let meterSmoothPeak = 0;
     let persistTimer = 0;
     /** FX history (not persisted — session only) */
     let undoStack = [];
@@ -2894,6 +2896,9 @@
           },
           video: false
         });
+        if (audioCtx && audioCtx.state === 'suspended') {
+          await audioCtx.resume();
+        }
       } catch (err) {
         const name = err && err.name;
         if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
@@ -2921,6 +2926,15 @@
       recordAnalyser.smoothingTimeConstant = 0.35;
       srcNode.connect(recordGainNode);
       recordGainNode.connect(recordAnalyser);
+
+      // Connect analyser to audioCtx.destination via 0-gain node so Web Audio
+      // hardware clock pulls samples continuously on Android Chrome & iOS Safari
+      try {
+        recordSilentGain = audioCtx.createGain();
+        recordSilentGain.gain.value = 0;
+        recordAnalyser.connect(recordSilentGain);
+        recordSilentGain.connect(audioCtx.destination);
+      } catch (_) {}
 
       let recordStream = mediaStream;
       try {
@@ -2979,6 +2993,9 @@
       if (recordGainNode) {
         recordGainNode.gain.value = Math.max(1, S.micLevel || 1);
       }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
       const data = new Uint8Array(recordAnalyser.fftSize);
       recordAnalyser.getByteTimeDomainData(data);
       let peak = 0;
@@ -2988,7 +3005,22 @@
       }
       // Meter already after gain node when live boost is active
       const visualBoost = recordUsedLiveGain ? 1 : Math.min(4, S.micLevel || 1);
-      const pct = Math.min(100, Math.round(peak * visualBoost * 160));
+      const effectivePeak = Math.min(1, peak * visualBoost);
+
+      // Smooth decay for natural VU meter physics
+      if (effectivePeak > meterSmoothPeak) {
+        meterSmoothPeak = effectivePeak;
+      } else {
+        meterSmoothPeak = Math.max(0, meterSmoothPeak * 0.88 - 0.002);
+      }
+
+      // Non-linear power scale (0.4 exponent) so quiet-to-normal speech (0.005 to 0.1 peak)
+      // produces clear, responsive bar movement (12% to 40%+) instead of flat 1%
+      let pct = 0;
+      if (meterSmoothPeak > 0.001) {
+        pct = Math.min(100, Math.round(Math.pow(meterSmoothPeak, 0.4) * 100));
+      }
+
       els.meterBar.style.width = pct + '%';
       const elapsed = (performance.now() - recordStartTs) / 1000;
       els.recTimer.textContent = fmtTime(elapsed, false);
@@ -3019,10 +3051,13 @@
         mediaStream = null;
       }
       try { if (recordGainNode) recordGainNode.disconnect(); } catch (_) {}
+      try { if (recordSilentGain) recordSilentGain.disconnect(); } catch (_) {}
       try { if (recordDest) recordDest.disconnect(); } catch (_) {}
       recordAnalyser = null;
       recordGainNode = null;
+      recordSilentGain = null;
       recordDest = null;
+      meterSmoothPeak = 0;
 
       const mime = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
       mediaRecorder = null;
