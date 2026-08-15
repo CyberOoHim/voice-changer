@@ -403,10 +403,12 @@
       lastExportName: '',
       recCountdownTimer: 0,
       previewTimer: 0,
+      recMode: 'standalone',
       ui: {
         fxSourceMode: 'local',
         fxRemoteUrl: '',
         maxRecordSec: 180,
+        recMode: 'standalone',
         recentPresetIds: [],
         presetSearch: ''
       }
@@ -455,6 +457,8 @@
       btnUndoRecord: $('btnUndoRecord'),
       btnRedoRecord: $('btnRedoRecord'),
       btnDeleteRecord: $('btnDeleteRecord'),
+      recModeStandalone: $('recModeStandalone'),
+      recModeAppend: $('recModeAppend'),
       recHistoryBar: $('recHistoryBar'),
       recTakeBadge: $('recTakeBadge'),
       fileInput: $('fileInput'),
@@ -674,6 +678,7 @@
       : null;
     if (!fxApi) throw new Error('VoxFx engine failed to load');
     const cloneBuffer = fxApi.cloneBuffer;
+    const concatBuffersWithCrossfade = fxApi.concatBuffersWithCrossfade;
     const toMonoBuffer = fxApi.toMonoBuffer;
     const applyBufferGain = fxApi.applyBufferGain;
     const normalizeRecordingBuffer = fxApi.normalizeRecordingBuffer;
@@ -882,6 +887,13 @@
       els.exportPref.value = S.lastExportFormat;
       if (els.maxRecordSec) els.maxRecordSec.value = String(S.ui.maxRecordSec);
       if (els.presetSearch) els.presetSearch.value = S.ui.presetSearch;
+      if (els.recModeStandalone && els.recModeAppend) {
+        const m = (p.ui && p.ui.recMode) || S.recMode || 'standalone';
+        S.recMode = m;
+        S.ui.recMode = m;
+        if (m === 'append') els.recModeAppend.checked = true;
+        else els.recModeStandalone.checked = true;
+      }
       syncGainSlidersUI();
       updateSkipLabels();
       updateExportButtons();
@@ -2365,11 +2377,22 @@
           toast('Recording too short — try again.', 'error');
           return;
         }
-        pushRecordTake(mono);
-        const curTake = recordHistory[recordHistoryIndex];
-        const takeLabel = curTake ? curTake.name : ('Take ' + takeCounter);
-        setBuffer(mono, { name: 'Recording (' + takeLabel + ')', clearVideo: true, fromRecHistory: true });
-        toast('Recording ready (' + takeLabel + ')', 'ok');
+
+        const isAppend = S.recMode === 'append' && !!S.buffer && S.buffer.length > 0;
+        if (isAppend) {
+          const combined = concatBuffersWithCrossfade(S.buffer, mono);
+          pushRecordTake(combined, { name: 'Take ' + (takeCounter + 1) + ' (Appended)' });
+          const curTake = recordHistory[recordHistoryIndex];
+          const takeLabel = curTake ? curTake.name : ('Take ' + takeCounter);
+          setBuffer(combined, { name: 'Recording (' + takeLabel + ')', clearVideo: true, fromRecHistory: true });
+          toast('Appended with crossfade (' + takeLabel + ')', 'ok');
+        } else {
+          pushRecordTake(mono);
+          const curTake = recordHistory[recordHistoryIndex];
+          const takeLabel = curTake ? curTake.name : ('Take ' + takeCounter);
+          setBuffer(mono, { name: 'Recording (' + takeLabel + ')', clearVideo: true, fromRecHistory: true });
+          toast('Recording ready (' + takeLabel + ')', 'ok');
+        }
       } catch (e) {
         console.error(e);
         toast("Couldn't process recording. Try again.", 'error');
@@ -3536,6 +3559,26 @@
       els.btnRecord.addEventListener('click', toggleRecord);
       if (els.btnUndoRecord) els.btnUndoRecord.addEventListener('click', undoRecording);
       if (els.btnRedoRecord) els.btnRedoRecord.addEventListener('click', redoRecording);
+      if (els.recModeStandalone) {
+        els.recModeStandalone.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            S.recMode = 'standalone';
+            S.ui = S.ui || {};
+            S.ui.recMode = S.recMode;
+            schedulePersist();
+          }
+        });
+      }
+      if (els.recModeAppend) {
+        els.recModeAppend.addEventListener('change', (e) => {
+          if (e.target.checked) {
+            S.recMode = 'append';
+            S.ui = S.ui || {};
+            S.ui.recMode = S.recMode;
+            schedulePersist();
+          }
+        });
+      }
       els.btnUpload.addEventListener('click', () => els.fileInput.click());
       els.fileInput.addEventListener('change', () => {
         const f = els.fileInput.files && els.fileInput.files[0];

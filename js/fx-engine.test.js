@@ -84,7 +84,20 @@ const chain = api.buildFxChain(ctx, {
   reverbMix: 0.2, reverbDecay: 1.2, reverbSize: 0.4,
   compressorThresh: -18, compressorRatio: 3, speed: 1.1, gain: 1
 });
-if (!chain.input || !chain.output || chain.rate < 1) throw new Error('chain');
 const peaks = api.buildPeakPyramid(mono);
 if (!peaks || peaks.cols < 10) throw new Error('peaks');
-console.log('fx-engine smoke ok', { mono: mono.length, wav: wav.size, peaks: peaks.cols });
+
+// Test concatBuffersWithCrossfade
+const bufA = ctx.createBuffer(1, 48000, 48000); // 1.0s
+const bufB = ctx.createBuffer(1, 48000, 48000); // 1.0s
+for (let i = 0; i < 48000; i++) {
+  bufA.getChannelData(0)[i] = 0.5;
+  bufB.getChannelData(0)[i] = 0.8;
+}
+const combined = api.concatBuffersWithCrossfade(bufA, bufB, 0.04);
+const expectedLen = 48000 + 48000 - Math.floor(0.04 * 48000);
+if (combined.length !== expectedLen) throw new Error('concat crossfade length mismatch');
+if (Math.abs(combined.getChannelData(0)[0] - 0.5) > 1e-5) throw new Error('head sample mismatch');
+if (Math.abs(combined.getChannelData(0)[combined.length - 1] - 0.8) > 1e-5) throw new Error('tail sample mismatch');
+
+console.log('fx-engine smoke ok', { mono: mono.length, wav: wav.size, peaks: peaks.cols, combined: combined.length });

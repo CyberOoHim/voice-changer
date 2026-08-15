@@ -165,6 +165,73 @@
       background: rgba(244, 63, 94, 0.18);
       color: #fecdd3;
     }
+    .rec-mode-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 2px;
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      background: rgba(15, 23, 32, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .8rem;
+      flex-wrap: wrap;
+    }
+    .rec-mode-title {
+      font-weight: 700;
+      color: var(--muted);
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .rec-mode-opt {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: var(--text);
+      user-select: none;
+      font-size: .82rem;
+      transition: color .15s;
+    }
+    .rec-mode-opt:hover {
+      color: var(--accent);
+    }
+    .rec-mode-opt input[type="radio"] {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
+      width: 15px;
+      height: 15px;
+      border: 1.5px solid var(--border);
+      border-radius: 50%;
+      outline: none;
+      display: grid;
+      place-content: center;
+      cursor: pointer;
+      background: transparent;
+      transition: border-color .15s, background .15s;
+    }
+    .rec-mode-opt input[type="radio"]::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      transform: scale(0);
+      transition: transform .12s ease-in-out;
+      background: var(--accent);
+    }
+    .rec-mode-opt input[type="radio"]:checked {
+      border-color: var(--accent);
+    }
+    .rec-mode-opt input[type="radio"]:checked::before {
+      transform: scale(1);
+    }
+    .rec-mode-opt input[type="radio"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
     .rec-history-bar {
       display: flex;
       align-items: center;
@@ -961,6 +1028,17 @@
         <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
         <button type="button" id="btnDeleteRecord" class="btn-rec-history btn-rec-delete" disabled aria-label="Delete recording take forever" title="Delete recording take forever">🗑 Delete Rec</button>
         <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v" />
+      </div>
+      <div class="rec-mode-row" role="radiogroup" aria-label="Recording mode">
+        <span class="rec-mode-title">Mode:</span>
+        <label class="rec-mode-opt" title="New recording creates a separate take">
+          <input type="radio" name="recMode" id="recModeStandalone" value="standalone" checked />
+          <span>New clip</span>
+        </label>
+        <label class="rec-mode-opt" title="Append new recording to the current audio with natural crossfade">
+          <input type="radio" name="recMode" id="recModeAppend" value="append" />
+          <span>Append (crossfade)</span>
+        </label>
       </div>
       <div id="recHistoryBar" class="rec-history-bar" hidden>
         <span id="recTakeBadge" class="rec-take-badge" aria-live="polite">Take 1 of 1</span>

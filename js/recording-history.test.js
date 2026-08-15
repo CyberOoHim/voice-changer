@@ -371,4 +371,101 @@ function createRecordingHistoryManager(maxCapacity = 10) {
   console.log('✓ Test 9 passed: Delete head and tail takes');
 }
 
-console.log('\nAll 9 Recording History test suites passed successfully!');
+function concatBuffersWithCrossfade(bufA, bufB, crossfadeSec = 0.04) {
+  if (!bufA || !bufA.length) return bufB ? cloneBuffer(bufB) : null;
+  if (!bufB || !bufB.length) return bufA ? cloneBuffer(bufA) : null;
+  const sr = bufA.sampleRate;
+  const maxFadeSec = Math.min(crossfadeSec, bufA.duration * 0.4, bufB.duration * 0.4);
+  const fadeFrames = Math.max(1, Math.floor(maxFadeSec * sr));
+  const totalFrames = bufA.length + bufB.length - fadeFrames;
+
+  const out = ctx.createBuffer(1, totalFrames, sr);
+  const outData = out.getChannelData(0);
+  const dataA = bufA.getChannelData(0);
+  const dataB = bufB.getChannelData(0);
+
+  const aHeadLen = bufA.length - fadeFrames;
+  outData.set(dataA.subarray(0, aHeadLen), 0);
+
+  for (let i = 0; i < fadeFrames; i++) {
+    const t = i / fadeFrames;
+    const gainA = Math.cos(t * 0.5 * Math.PI);
+    const gainB = Math.sin(t * 0.5 * Math.PI);
+    outData[aHeadLen + i] = dataA[aHeadLen + i] * gainA + dataB[i] * gainB;
+  }
+
+  outData.set(dataB.subarray(fadeFrames), aHeadLen + fadeFrames);
+  return out;
+}
+
+// Test 10: Append recording mode with crossfade and undo/redo management
+{
+  const mgr = createRecordingHistoryManager(10);
+  let workingBuffer = null;
+
+  // 1. Record Take 1 (1.0s) as standalone
+  const b1 = ctx.createBuffer(1, 48000, 48000);
+  for (let i = 0; i < 48000; i++) b1.getChannelData(0)[i] = 0.2;
+  mgr.pushRecordTake(b1, { name: 'Take 1' });
+  workingBuffer = b1;
+
+  assert.strictEqual(mgr.getHistory().length, 1);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 1');
+  assert.strictEqual(workingBuffer.length, 48000);
+
+  // 2. Record Take 2 (1.0s) with APPEND mode (crossfade)
+  const b2 = ctx.createBuffer(1, 48000, 48000);
+  for (let i = 0; i < 48000; i++) b2.getChannelData(0)[i] = 0.6;
+  const appended1 = concatBuffersWithCrossfade(workingBuffer, b2, 0.04);
+  mgr.pushRecordTake(appended1, { name: 'Take 2 (Appended)' });
+  workingBuffer = appended1;
+
+  const fadeFrames = Math.floor(0.04 * 48000);
+  const expectedLen1 = 48000 + 48000 - fadeFrames;
+  assert.strictEqual(mgr.getHistory().length, 2);
+  assert.strictEqual(mgr.getIndex(), 1);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 2 (Appended)');
+  assert.strictEqual(workingBuffer.length, expectedLen1);
+
+  // 3. Undo to Take 1
+  workingBuffer = mgr.undo();
+  assert.strictEqual(mgr.getIndex(), 0);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 1');
+  assert.strictEqual(workingBuffer.length, 48000);
+  assert.strictEqual(mgr.canUndo(), false);
+  assert.strictEqual(mgr.canRedo(), true);
+
+  // 4. Redo to Take 2 (Appended)
+  workingBuffer = mgr.redo();
+  assert.strictEqual(mgr.getIndex(), 1);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 2 (Appended)');
+  assert.strictEqual(workingBuffer.length, expectedLen1);
+  assert.strictEqual(mgr.canUndo(), true);
+  assert.strictEqual(mgr.canRedo(), false);
+
+  // 5. Append Take 3 (0.5s) to workingBuffer
+  const b3 = ctx.createBuffer(1, 24000, 48000);
+  for (let i = 0; i < 24000; i++) b3.getChannelData(0)[i] = 0.9;
+  const appended2 = concatBuffersWithCrossfade(workingBuffer, b3, 0.04);
+  mgr.pushRecordTake(appended2, { name: 'Take 3 (Appended)' });
+  workingBuffer = appended2;
+
+  const expectedLen2 = expectedLen1 + 24000 - fadeFrames;
+  assert.strictEqual(mgr.getHistory().length, 3);
+  assert.strictEqual(mgr.getIndex(), 2);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 3 (Appended)');
+  assert.strictEqual(workingBuffer.length, expectedLen2);
+
+  // 6. Undo back through takes: Take 3 (appended) -> Take 2 (appended) -> Take 1 (original)
+  workingBuffer = mgr.undo();
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 2 (Appended)');
+  assert.strictEqual(workingBuffer.length, expectedLen1);
+
+  workingBuffer = mgr.undo();
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 1');
+  assert.strictEqual(workingBuffer.length, 48000);
+
+  console.log('✓ Test 10 passed: Append mode crossfade and undo/redo management');
+}
+
+console.log('\nAll 10 Recording History test suites passed successfully!');

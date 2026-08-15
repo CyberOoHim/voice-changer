@@ -27,6 +27,38 @@
       return out;
     }
 
+    function concatBuffersWithCrossfade(bufA, bufB, crossfadeSec = 0.04) {
+      if (!bufA || !bufA.length) return bufB ? cloneBuffer(bufB) : null;
+      if (!bufB || !bufB.length) return bufA ? cloneBuffer(bufA) : null;
+      const ctx = ensureAudioCtx();
+      const sr = bufA.sampleRate;
+      const maxFadeSec = Math.min(crossfadeSec, bufA.duration * 0.4, bufB.duration * 0.4);
+      const fadeFrames = Math.max(1, Math.floor(maxFadeSec * sr));
+      const totalFrames = bufA.length + bufB.length - fadeFrames;
+
+      const out = ctx.createBuffer(1, totalFrames, sr);
+      const outData = out.getChannelData(0);
+      const dataA = bufA.getChannelData(0);
+      const dataB = bufB.getChannelData(0);
+
+      // Part 1: bufA before crossfade region
+      const aHeadLen = bufA.length - fadeFrames;
+      outData.set(dataA.subarray(0, aHeadLen), 0);
+
+      // Part 2: Crossfade overlap with equal-power curve
+      for (let i = 0; i < fadeFrames; i++) {
+        const t = i / fadeFrames;
+        const gainA = Math.cos(t * 0.5 * Math.PI);
+        const gainB = Math.sin(t * 0.5 * Math.PI);
+        outData[aHeadLen + i] = dataA[aHeadLen + i] * gainA + dataB[i] * gainB;
+      }
+
+      // Part 3: bufB after crossfade region
+      outData.set(dataB.subarray(fadeFrames), aHeadLen + fadeFrames);
+
+      return out;
+    }
+
     function toMonoBuffer(src) {
       const ctx = ensureAudioCtx();
       if (src.numberOfChannels === 1) {
@@ -468,6 +500,7 @@
 
     return {
       cloneBuffer,
+      concatBuffersWithCrossfade,
       toMonoBuffer,
       applyBufferGain,
       normalizeRecordingBuffer,
