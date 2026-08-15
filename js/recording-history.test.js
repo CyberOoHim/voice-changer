@@ -97,6 +97,21 @@ function createRecordingHistoryManager(maxCapacity = 10) {
     return recordHistory;
   }
 
+  function deleteCurrentRecord() {
+    if (recordHistoryIndex < 0 || recordHistoryIndex >= recordHistory.length || !recordHistory.length) return null;
+    const deleted = recordHistory[recordHistoryIndex];
+    recordHistory.splice(recordHistoryIndex, 1);
+    if (recordHistory.length > 0) {
+      if (recordHistoryIndex >= recordHistory.length) {
+        recordHistoryIndex = recordHistory.length - 1;
+      }
+      return cloneBuffer(recordHistory[recordHistoryIndex].buffer);
+    } else {
+      recordHistoryIndex = -1;
+      return null;
+    }
+  }
+
   function getIndex() {
     return recordHistoryIndex;
   }
@@ -107,6 +122,7 @@ function createRecordingHistoryManager(maxCapacity = 10) {
     canRedo,
     undo,
     redo,
+    deleteCurrentRecord,
     getCurrentTake,
     clear,
     getHistory,
@@ -274,4 +290,85 @@ function createRecordingHistoryManager(maxCapacity = 10) {
   console.log('✓ Test 6 passed: Clear history');
 }
 
-console.log('\nAll 6 Recording History test suites passed successfully!');
+// Test 7: Delete single take (permanently emptied)
+{
+  const mgr = createRecordingHistoryManager(10);
+  const b = ctx.createBuffer(1, 4800, 48000);
+  mgr.pushRecordTake(b, { name: 'Take 1' });
+  assert.strictEqual(mgr.getHistory().length, 1);
+
+  const res = mgr.deleteCurrentRecord();
+  assert.strictEqual(res, null);
+  assert.strictEqual(mgr.getHistory().length, 0);
+  assert.strictEqual(mgr.getIndex(), -1);
+  assert.strictEqual(mgr.canUndo(), false);
+  assert.strictEqual(mgr.canRedo(), false);
+  assert.strictEqual(mgr.getCurrentTake(), null);
+  console.log('✓ Test 7 passed: Delete single take');
+}
+
+// Test 8: Delete middle take from multiple takes (not in undo/redo anymore)
+{
+  const mgr = createRecordingHistoryManager(10);
+  for (let i = 1; i <= 3; i++) {
+    const b = ctx.createBuffer(1, 4800, 48000);
+    b.getChannelData(0)[0] = i;
+    mgr.pushRecordTake(b, { name: 'Take ' + i });
+  }
+
+  // Active is Take 3 (index 2). Undo to Take 2 (index 1).
+  mgr.undo();
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 2');
+  assert.strictEqual(mgr.getIndex(), 1);
+
+  // Permanently delete Take 2
+  mgr.deleteCurrentRecord();
+
+  // History now has [Take 1, Take 3]
+  assert.strictEqual(mgr.getHistory().length, 2);
+  assert.strictEqual(mgr.getHistory()[0].name, 'Take 1');
+  assert.strictEqual(mgr.getHistory()[1].name, 'Take 3');
+  assert.strictEqual(mgr.getIndex(), 1); // Now points to Take 3
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 3');
+
+  // Undo goes directly from Take 3 to Take 1 (Take 2 is completely gone)
+  mgr.undo();
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 1');
+  assert.strictEqual(mgr.canUndo(), false);
+  assert.strictEqual(mgr.canRedo(), true);
+
+  // Redo goes directly from Take 1 to Take 3
+  mgr.redo();
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 3');
+  assert.strictEqual(mgr.canRedo(), false);
+  console.log('✓ Test 8 passed: Delete middle take and verify total removal from undo/redo');
+}
+
+// Test 9: Delete tail take and head take
+{
+  const mgr = createRecordingHistoryManager(10);
+  for (let i = 1; i <= 3; i++) {
+    const b = ctx.createBuffer(1, 4800, 48000);
+    mgr.pushRecordTake(b, { name: 'Take ' + i });
+  }
+
+  // Delete Take 3 (head)
+  mgr.deleteCurrentRecord();
+  assert.strictEqual(mgr.getHistory().length, 2);
+  assert.strictEqual(mgr.getIndex(), 1);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 2');
+  assert.strictEqual(mgr.canRedo(), false);
+
+  // Undo to Take 1 and delete Take 1
+  mgr.undo();
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 1');
+  mgr.deleteCurrentRecord();
+  assert.strictEqual(mgr.getHistory().length, 1);
+  assert.strictEqual(mgr.getIndex(), 0);
+  assert.strictEqual(mgr.getCurrentTake().name, 'Take 2');
+  assert.strictEqual(mgr.canUndo(), false);
+  assert.strictEqual(mgr.canRedo(), false);
+  console.log('✓ Test 9 passed: Delete head and tail takes');
+}
+
+console.log('\nAll 9 Recording History test suites passed successfully!');

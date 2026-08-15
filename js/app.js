@@ -454,6 +454,7 @@
       btnUpload: $('btnUpload'),
       btnUndoRecord: $('btnUndoRecord'),
       btnRedoRecord: $('btnRedoRecord'),
+      btnDeleteRecord: $('btnDeleteRecord'),
       recHistoryBar: $('recHistoryBar'),
       recTakeBadge: $('recTakeBadge'),
       fileInput: $('fileInput'),
@@ -545,6 +546,11 @@
       resetAudioModal: $('resetAudioModal'),
       resetAudioCancel: $('resetAudioCancel'),
       resetAudioConfirm: $('resetAudioConfirm'),
+      deleteRecordModal: $('deleteRecordModal'),
+      deleteRecordTitle: $('deleteRecordTitle'),
+      deleteRecordDesc: $('deleteRecordDesc'),
+      deleteRecordCancel: $('deleteRecordCancel'),
+      deleteRecordConfirm: $('deleteRecordConfirm'),
       resetProjectModal: $('resetProjectModal'),
       resetProjectCancel: $('resetProjectCancel'),
       resetProjectConfirm: $('resetProjectConfirm')
@@ -1106,6 +1112,12 @@
           ? 'Redo to ' + (recordHistory[recordHistoryIndex + 1] ? recordHistory[recordHistoryIndex + 1].name : ('Take ' + (recordHistoryIndex + 2))) + ' (Alt+Y)'
           : 'Redo recording take (Alt+Y)';
       }
+      if (els.btnDeleteRecord) {
+        els.btnDeleteRecord.disabled = !hasHistory || isBusy;
+        els.btnDeleteRecord.title = hasHistory
+          ? 'Permanently delete ' + (recordHistory[recordHistoryIndex] ? recordHistory[recordHistoryIndex].name : 'this recording')
+          : 'Delete recording take forever';
+      }
       if (els.recHistoryBar) {
         els.recHistoryBar.hidden = !hasHistory;
       }
@@ -1167,6 +1179,46 @@
       });
       updateRecordHistoryUI();
       toast('Restored ' + target.name + ' (' + (recordHistoryIndex + 1) + '/' + recordHistory.length + ')', 'ok');
+    }
+
+    function deleteCurrentRecord() {
+      if (recordHistoryIndex < 0 || recordHistoryIndex >= recordHistory.length || !recordHistory.length) return;
+      const deletedName = recordHistory[recordHistoryIndex].name;
+      recordHistory.splice(recordHistoryIndex, 1);
+      if (recordHistory.length > 0) {
+        if (recordHistoryIndex >= recordHistory.length) {
+          recordHistoryIndex = recordHistory.length - 1;
+        }
+        const target = recordHistory[recordHistoryIndex];
+        if (target && target.buffer) {
+          setBuffer(cloneBuffer(target.buffer), {
+            name: target.name,
+            clearVideo: true,
+            fromRecHistory: true
+          });
+        }
+        updateRecordHistoryUI();
+        toast('Permanently deleted ' + deletedName + '. Active: ' + target.name + ' (' + (recordHistoryIndex + 1) + '/' + recordHistory.length + ')', 'ok');
+      } else {
+        recordHistoryIndex = -1;
+        stopPlayback(true);
+        setDry(false, false);
+        S.buffer = null;
+        S.originalBuffer = null;
+        S.playhead = 0;
+        S.sourceName = '';
+        clearHistory();
+        revokeVideo();
+        els.waveEmpty.classList.remove('hidden');
+        if (els.sourceMeta) els.sourceMeta.textContent = '';
+        updateUndoButtons();
+        updateRecordHistoryUI();
+        updateTransportEnabled();
+        updateTimeChip();
+        drawWave();
+        schedulePersist();
+        toast('Permanently deleted ' + deletedName + '. No recordings left.', 'ok');
+      }
     }
 
     function clearRecordHistory() {
@@ -3386,7 +3438,7 @@
        Keyboard
        ========================================================= */
     function onKey(e) {
-      const modalOpen = [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.resetProjectModal, els.packModal]
+      const modalOpen = [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal]
         .filter(Boolean)
         .find((m) => m.classList.contains('show'));
       if (modalOpen) {
@@ -3620,6 +3672,28 @@
         resetAudio();
       });
 
+      if (els.btnDeleteRecord) {
+        els.btnDeleteRecord.addEventListener('click', () => {
+          if (recordHistoryIndex < 0 || !recordHistory.length) {
+            toast('No recording to delete');
+            return;
+          }
+          const cur = recordHistory[recordHistoryIndex];
+          const name = cur ? cur.name : ('Take ' + (recordHistoryIndex + 1));
+          if (els.deleteRecordDesc) {
+            els.deleteRecordDesc.textContent = 'Permanently delete "' + name + '"? It will be removed forever and cannot be restored from the undo/redo buffer.';
+          }
+          showModal(els.deleteRecordModal);
+        });
+      }
+      if (els.deleteRecordCancel) els.deleteRecordCancel.addEventListener('click', () => hideModal(els.deleteRecordModal));
+      if (els.deleteRecordConfirm) {
+        els.deleteRecordConfirm.addEventListener('click', () => {
+          hideModal(els.deleteRecordModal);
+          deleteCurrentRecord();
+        });
+      }
+
       els.tabBuiltIn.addEventListener('click', () => setPresetTab('built-in'));
       els.tabCustom.addEventListener('click', () => setPresetTab('custom'));
       els.btnSaveSettings.addEventListener('click', openSaveModal);
@@ -3776,7 +3850,7 @@
       window.addEventListener('offline', updateOnline);
 
       // Backdrop click closes modals
-      [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.resetProjectModal, els.packModal].forEach((m) => {
+      [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal].forEach((m) => {
         if (!m) return;
         m.addEventListener('click', (e) => {
           if (e.target === m) hideModal(m);

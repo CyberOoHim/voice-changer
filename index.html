@@ -148,7 +148,7 @@
 
     .source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
     @media (min-width: 640px) {
-      .source-actions { grid-template-columns: auto auto auto auto 1fr; align-items: center; }
+      .source-actions { grid-template-columns: auto auto auto auto auto 1fr; align-items: center; }
     }
     .btn-rec-history {
       font-size: .84rem;
@@ -159,6 +159,11 @@
     .btn-rec-history:hover:not(:disabled) {
       border-color: var(--accent);
       background: rgba(56, 189, 248, 0.12);
+    }
+    .btn-rec-delete:hover:not(:disabled) {
+      border-color: rgba(244, 63, 94, 0.6);
+      background: rgba(244, 63, 94, 0.18);
+      color: #fecdd3;
     }
     .rec-history-bar {
       display: flex;
@@ -954,6 +959,7 @@
         <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
         <button type="button" id="btnUndoRecord" class="btn-rec-history" disabled aria-label="Undo recording take" title="Undo recording take (Alt+Z)">↶ Undo Rec</button>
         <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
+        <button type="button" id="btnDeleteRecord" class="btn-rec-history btn-rec-delete" disabled aria-label="Delete recording take forever" title="Delete recording take forever">🗑 Delete Rec</button>
         <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v" />
       </div>
       <div id="recHistoryBar" class="rec-history-bar" hidden>
@@ -1174,6 +1180,18 @@
       </div>
       <div class="modal-actions" style="margin-top:12px">
         <button type="button" id="moreSkipClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Recording confirmation modal -->
+  <div id="deleteRecordModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="deleteRecordTitle" hidden>
+    <div class="modal">
+      <h3 id="deleteRecordTitle">Delete Recording?</h3>
+      <p id="deleteRecordDesc">This will permanently delete this recording take. It will be removed forever and cannot be restored from the undo/redo buffer.</p>
+      <div class="modal-actions">
+        <button type="button" id="deleteRecordCancel">Cancel</button>
+        <button type="button" id="deleteRecordConfirm" class="btn-danger">Delete Forever</button>
       </div>
     </div>
   </div>
