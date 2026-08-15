@@ -498,6 +498,52 @@
       return new Blob([buffer], { type: 'audio/wav' });
     }
 
+    async function bufferToBase64Wav(buf) {
+      if (!buf) return '';
+      const blob = bufferToWav(buf);
+      if (typeof blob.arrayBuffer === 'function') {
+        const ab = await blob.arrayBuffer();
+        const bytes = new Uint8Array(ab);
+        if (typeof Buffer !== 'undefined') {
+          return 'data:audio/wav;base64,' + Buffer.from(bytes).toString('base64');
+        }
+        let binary = '';
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return 'data:audio/wav;base64,' + (typeof btoa === 'function' ? btoa(binary) : '');
+      }
+      return new Promise((resolve, reject) => {
+        if (typeof FileReader === 'undefined') return resolve('');
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function base64ToArrayBuffer(base64) {
+      if (!base64 || typeof base64 !== 'string') return new ArrayBuffer(0);
+      const clean = base64.replace(/^data:audio\/[a-z0-9-+.]+;base64,/, '');
+      if (typeof Buffer !== 'undefined') {
+        const buf = Buffer.from(clean, 'base64');
+        const ab = new ArrayBuffer(buf.length);
+        const view = new Uint8Array(ab);
+        for (let i = 0; i < buf.length; ++i) {
+          view[i] = buf[i];
+        }
+        return ab;
+      }
+      const binaryString = typeof atob === 'function' ? atob(clean) : '';
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
     return {
       cloneBuffer,
       concatBuffersWithCrossfade,
@@ -511,7 +557,9 @@
       pitchShiftKeepLength,
       buildPeakPyramid,
       buildFxChain,
-      bufferToWav
+      bufferToWav,
+      bufferToBase64Wav,
+      base64ToArrayBuffer
     };
   }
 

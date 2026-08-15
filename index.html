@@ -995,6 +995,68 @@
       background: var(--bg2);
       padding: 0 8px;
     }
+    .project-info-box {
+      font-size: .8rem;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      line-height: 1.45;
+    }
+    .saved-projects-list {
+      display: grid;
+      gap: 8px;
+      max-height: 270px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    .saved-project-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .15s;
+    }
+    .saved-project-card:hover {
+      border-color: var(--accent);
+    }
+    .saved-project-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .saved-project-title {
+      font-weight: 700;
+      font-size: .9rem;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .saved-project-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+    .saved-project-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .btn-xs {
+      min-height: 32px;
+      padding: 0.2rem 0.6rem;
+      font-size: .78rem;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
@@ -1014,6 +1076,7 @@
           <span class="dot" aria-hidden="true"></span>
           <span id="netPillText">Online</span>
         </span>
+        <button type="button" id="btnProject" class="btn-ghost" aria-label="Projects" title="Projects (Save &amp; Restore) · Ctrl+S / Ctrl+O">📁 Project</button>
         <button type="button" id="btnSettings" class="btn-ghost" aria-label="Settings">⚙</button>
       </div>
     </header>
@@ -1027,7 +1090,7 @@
         <button type="button" id="btnUndoRecord" class="btn-rec-history" disabled aria-label="Undo recording take" title="Undo recording take (Alt+Z)">↶ Undo Rec</button>
         <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
         <button type="button" id="btnDeleteRecord" class="btn-rec-history btn-rec-delete" disabled aria-label="Delete recording take forever" title="Delete recording take forever">🗑 Delete Rec</button>
-        <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v" />
+        <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,.voxproject,.json,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v,application/json" />
       </div>
       <div class="rec-mode-row" role="radiogroup" aria-label="Recording mode">
         <span class="rec-mode-title">Mode:</span>
@@ -1044,9 +1107,9 @@
         <span id="recTakeBadge" class="rec-take-badge" aria-live="polite">Take 1 of 1</span>
         <span class="rec-take-hint">FIFO buffer · max 10 takes</span>
       </div>
-      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio or video files here">
-        <strong>Drop audio or video</strong>
-        <small>WAV · MP3 · AAC · M4A · MP4 · MOV · WebM</small>
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio, video, or .voxproject files here">
+        <strong>Drop audio, video or .voxproject</strong>
+        <small>WAV · MP3 · AAC · M4A · MP4 · MOV · WebM · .voxproject</small>
       </div>
       <div id="meterWrap" class="meter-wrap" aria-hidden="true">
         <div class="meter" aria-hidden="true"><i id="meterBar"></i></div>
@@ -1120,10 +1183,12 @@
 
     <!-- EXPORT -->
     <section class="card" aria-labelledby="exportTitle">
-      <h2 id="exportTitle">Export</h2>
+      <h2 id="exportTitle">Export &amp; Projects</h2>
       <div class="export-row">
         <button type="button" id="btnExportPrimary" class="btn-primary" disabled aria-label="Export WAV">Export WAV</button>
         <button type="button" id="btnExportSecondary" class="btn-secondary" disabled aria-label="Export MP3">Export MP3</button>
+        <button type="button" id="btnSaveProject" class="btn-primary" aria-label="Save project" title="Save full project settings &amp; audio buffer (Ctrl+S)">💾 Save Project</button>
+        <button type="button" id="btnRestoreProject" class="btn-secondary" aria-label="Restore project" title="Restore project from file or browser library (Ctrl+O)">📂 Restore Project</button>
         <button type="button" id="btnShare" hidden disabled aria-label="Share export">Share</button>
         <button type="button" id="btnResetProject" class="btn-danger" aria-label="Reset project">Reset Project</button>
       </div>
@@ -1308,6 +1373,49 @@
       <div class="modal-actions">
         <button type="button" id="resetProjectCancel">Cancel</button>
         <button type="button" id="resetProjectConfirm" class="btn-danger">Reset Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Manager (Save / Restore) modal -->
+  <div id="projectModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle" hidden>
+    <div class="modal" style="width:min(520px,100%);">
+      <h3 id="projectModalTitle">Project Manager</h3>
+      <p style="margin-bottom:10px;">Save and restore complete studio sessions: audio buffer, multi-take recording buffer, FX parameters, presets, and UI settings.</p>
+
+      <div class="tabs" role="tablist" aria-label="Project Actions" style="margin-bottom:12px;">
+        <button type="button" id="tabProjectSave" class="active" role="tab" aria-selected="true">💾 Save Project</button>
+        <button type="button" id="tabProjectRestore" role="tab" aria-selected="false">📂 Saved &amp; Restore</button>
+      </div>
+
+      <!-- Save Panel -->
+      <div id="panelProjectSave" class="project-panel">
+        <label for="projectNameInput">Project Name</label>
+        <input type="text" id="projectNameInput" maxlength="60" placeholder="e.g. My Voice Project" autocomplete="off" />
+        <div id="projectSaveSummary" class="project-info-box" style="margin-bottom:12px;">
+          <!-- dynamic summary populated in JS -->
+        </div>
+        <div class="row" style="gap:8px; justify-content:flex-end;">
+          <button type="button" id="btnExportProjectFile" class="btn-secondary" title="Download standalone .voxproject file">⬇ Export File (.voxproject)</button>
+          <button type="button" id="btnSaveProjectDb" class="btn-primary" title="Save directly into this browser's library">💾 Save to Browser</button>
+        </div>
+      </div>
+
+      <!-- Restore / Library Panel -->
+      <div id="panelProjectRestore" class="project-panel" hidden>
+        <div class="row spread" style="margin-bottom:10px; align-items:center;">
+          <span style="font-size:.8rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;">Browser Library</span>
+          <button type="button" id="btnOpenProjectFile" class="btn-primary" style="font-size:.82rem; min-height:36px; padding:0.4rem 0.8rem;">📂 Open File (.voxproject)</button>
+          <input type="file" id="projectFileInput" class="sr-only" accept=".voxproject,.json,application/json" />
+        </div>
+        <div id="savedProjectsList" class="saved-projects-list"></div>
+        <div id="savedProjectsEmpty" class="empty-customs" style="padding:16px 8px; margin-bottom:8px;" hidden>
+          No saved projects in this browser yet.<br />Save a project on the <strong>Save Project</strong> tab or open a <strong>.voxproject</strong> file.
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:14px;">
+        <button type="button" id="projectModalClose">Close</button>
       </div>
     </div>
   </div>

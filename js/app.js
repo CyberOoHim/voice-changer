@@ -557,7 +557,25 @@
       deleteRecordConfirm: $('deleteRecordConfirm'),
       resetProjectModal: $('resetProjectModal'),
       resetProjectCancel: $('resetProjectCancel'),
-      resetProjectConfirm: $('resetProjectConfirm')
+      resetProjectConfirm: $('resetProjectConfirm'),
+      btnProject: $('btnProject'),
+      btnSaveProject: $('btnSaveProject'),
+      btnRestoreProject: $('btnRestoreProject'),
+      projectModal: $('projectModal'),
+      projectModalTitle: $('projectModalTitle'),
+      tabProjectSave: $('tabProjectSave'),
+      tabProjectRestore: $('tabProjectRestore'),
+      panelProjectSave: $('panelProjectSave'),
+      panelProjectRestore: $('panelProjectRestore'),
+      projectNameInput: $('projectNameInput'),
+      projectSaveSummary: $('projectSaveSummary'),
+      btnExportProjectFile: $('btnExportProjectFile'),
+      btnSaveProjectDb: $('btnSaveProjectDb'),
+      btnOpenProjectFile: $('btnOpenProjectFile'),
+      projectFileInput: $('projectFileInput'),
+      savedProjectsList: $('savedProjectsList'),
+      savedProjectsEmpty: $('savedProjectsEmpty'),
+      projectModalClose: $('projectModalClose')
     };
 
     /* =========================================================
@@ -690,6 +708,8 @@
     const buildPeakPyramid = fxApi.buildPeakPyramid;
     const buildFxChain = fxApi.buildFxChain;
     const bufferToWav = fxApi.bufferToWav;
+    const bufferToBase64Wav = fxApi.bufferToBase64Wav;
+    const base64ToArrayBuffer = fxApi.base64ToArrayBuffer;
 
     /* =========================================================
        Persistence
@@ -2443,9 +2463,9 @@
     function setDropzoneIdle() {
       els.dropzone.replaceChildren();
       const strong = document.createElement('strong');
-      strong.textContent = 'Drop audio or video';
+      strong.textContent = 'Drop audio, video or .voxproject';
       const small = document.createElement('small');
-      small.textContent = 'WAV · MP3 · AAC · M4A · MP4 · MOV · WebM';
+      small.textContent = 'WAV · MP3 · AAC · M4A · MP4 · MOV · WebM · .voxproject';
       els.dropzone.append(strong, small);
     }
 
@@ -2460,6 +2480,32 @@
 
     async function loadFile(file) {
       if (!file || S.loading || S.baking) return;
+
+      const fileNameLower = (file.name || '').toLowerCase();
+      // Check if file is a .voxproject or project JSON
+      if (fileNameLower.endsWith('.voxproject') || (file.type === 'application/json' || fileNameLower.endsWith('.json'))) {
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (parsed && (parsed.kind === 'voxclip.studio.project.v1' || parsed.kind === 'voxclip.project' || (parsed.settings && parsed.audio) || (parsed.metadata && parsed.settings))) {
+            if (S.buffer || (recordHistory && recordHistory.length > 0)) {
+              const ok = confirm('Restore project “' + (parsed.name || (parsed.metadata && parsed.metadata.name) || 'Project') + '”? Current audio and settings will be replaced.');
+              if (!ok) {
+                toast('Project restore cancelled');
+                return;
+              }
+            }
+            await restoreProjectFromData(parsed);
+            return;
+          }
+        } catch (e) {
+          if (fileNameLower.endsWith('.voxproject')) {
+            toast('Invalid or corrupted .voxproject file.', 'error');
+            return;
+          }
+        }
+      }
+
       if (file.size > LARGE_FILE_BYTES) {
         toast('Large file — this may take a moment to decode.');
       }
@@ -3394,6 +3440,508 @@
     }
 
     /* =========================================================
+       Project Manager & IndexedDB Store
+       ========================================================= */
+    const IDB_NAME = 'VoxClipStudioProjects';
+    const IDB_STORE = 'projects';
+    const IDB_VERSION = 1;
+
+    function openProjectsDb() {
+      return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+          return reject(new Error('IndexedDB is not supported in this environment'));
+        }
+        const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            const store = db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+            store.createIndex('updatedAt', 'updatedAt', { unique: false });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error || new Error('Failed to open projects database'));
+      });
+    }
+
+    async function saveProjectToDb(projectDoc) {
+      const db = await openProjectsDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([IDB_STORE], 'readwrite');
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.put(projectDoc);
+        req.onsuccess = () => resolve(projectDoc.id);
+        req.onerror = () => reject(req.error || new Error('Failed to save project to IndexedDB'));
+      });
+    }
+
+    async function listProjectsFromDb() {
+      const db = await openProjectsDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([IDB_STORE], 'readonly');
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const items = req.result || [];
+          items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+          resolve(items);
+        };
+        req.onerror = () => reject(req.error || new Error('Failed to list projects'));
+      });
+    }
+
+    async function getProjectFromDb(id) {
+      const db = await openProjectsDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([IDB_STORE], 'readonly');
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error || new Error('Failed to load project'));
+      });
+    }
+
+    async function deleteProjectFromDb(id) {
+      const db = await openProjectsDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction([IDB_STORE], 'readwrite');
+        const store = tx.objectStore(IDB_STORE);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error || new Error('Failed to delete project'));
+      });
+    }
+
+    async function createProjectSnapshot(name) {
+      const now = Date.now();
+      const projName = String(name || '').trim() || (S.sourceName ? (S.sourceName.startsWith('Take') || S.sourceName.startsWith('Recording') ? ('Project ' + S.sourceName) : S.sourceName) : ('VoxProject ' + new Date().toISOString().slice(0, 10)));
+
+      const takesData = [];
+      for (const take of recordHistory) {
+        if (!take || !take.buffer) continue;
+        let base64 = '';
+        try {
+          base64 = await bufferToBase64Wav(take.buffer);
+        } catch (e) {
+          console.warn('Failed to encode take buffer:', e);
+        }
+        takesData.push({
+          id: String(take.id || uid()),
+          name: String(take.name || 'Take'),
+          duration: take.buffer.duration,
+          sampleRate: take.buffer.sampleRate,
+          createdAt: Number(take.createdAt) || now,
+          wavBase64: base64
+        });
+      }
+
+      let currentBase64 = '';
+      if (S.buffer) {
+        try {
+          currentBase64 = await bufferToBase64Wav(S.buffer);
+        } catch (e) {
+          console.warn('Failed to encode current buffer:', e);
+        }
+      }
+
+      let origBase64 = '';
+      if (S.originalBuffer) {
+        try {
+          origBase64 = await bufferToBase64Wav(S.originalBuffer);
+        } catch (e) {
+          console.warn('Failed to encode original buffer:', e);
+        }
+      }
+
+      return {
+        id: uid(),
+        kind: 'voxclip.studio.project.v1',
+        version: 3,
+        name: projName,
+        createdAt: now,
+        updatedAt: now,
+        metadata: {
+          name: projName,
+          sourceName: S.sourceName || '',
+          takeCounter,
+          recordHistoryIndex,
+          createdAt: now,
+          updatedAt: now,
+          totalTakes: takesData.length,
+          duration: S.buffer ? S.buffer.duration : 0
+        },
+        settings: {
+          fx: { ...S.fx },
+          presetChain: [...S.presetChain],
+          presetChainMix: sanitizeChainMix(S.presetChainMix, S.presetChain.length),
+          activePresetId: S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null,
+          activeCustomId: S.activeCustomId,
+          customSettings: Array.isArray(S.customSettings) ? JSON.parse(JSON.stringify(S.customSettings)) : [],
+          ui: {
+            loop: !!S.loop,
+            skipIntervalSec: S.skipIntervalSec,
+            lastExportFormat: S.lastExportFormat,
+            advancedLabExpanded: !!S.advancedLabExpanded,
+            presetsSection: S.presetsSection || 'built-in',
+            micLevel: S.micLevel,
+            inputGain: S.inputGain,
+            fxSourceMode: (S.ui && S.ui.fxSourceMode) || 'local',
+            fxRemoteUrl: (S.ui && S.ui.fxRemoteUrl) || '',
+            maxRecordSec: (S.ui && S.ui.maxRecordSec) || 180,
+            recMode: S.recMode || 'standalone',
+            recentPresetIds: (S.ui && S.ui.recentPresetIds) ? S.ui.recentPresetIds.slice(0, 8) : [],
+            presetSearch: (S.ui && S.ui.presetSearch) || '',
+            waveZoom: S.waveZoom || 1,
+            waveViewStart: S.waveViewStart || 0
+          }
+        },
+        audio: {
+          hasAudio: !!S.buffer,
+          duration: S.buffer ? S.buffer.duration : 0,
+          sampleRate: S.buffer ? S.buffer.sampleRate : 48000,
+          current: S.buffer ? {
+            duration: S.buffer.duration,
+            sampleRate: S.buffer.sampleRate,
+            wavBase64: currentBase64
+          } : null,
+          original: S.originalBuffer ? {
+            duration: S.originalBuffer.duration,
+            sampleRate: S.originalBuffer.sampleRate,
+            wavBase64: origBase64
+          } : null,
+          takes: takesData
+        }
+      };
+    }
+
+    async function restoreProjectFromData(projectDoc) {
+      if (!projectDoc || typeof projectDoc !== 'object') {
+        throw new Error('Invalid project file format');
+      }
+      stopPlayback(true);
+      if (S.recording) stopRecording();
+      setDry(false, false);
+      revokeVideo();
+
+      const settings = projectDoc.settings || projectDoc;
+      const uiSettings = settings.ui || {};
+
+      // Restore FX
+      S.fx = mergeFx(settings.fx);
+      S.presetChain = sanitizePresetChain(settings.presetChain);
+      S.presetChainMix = sanitizeChainMix(settings.presetChainMix, S.presetChain.length);
+      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
+      S.activeCustomId = settings.activeCustomId || null;
+
+      // Restore Custom presets if present in project
+      if (Array.isArray(settings.customSettings)) {
+        const mergedCustoms = [...S.customSettings];
+        for (const c of settings.customSettings) {
+          if (!mergedCustoms.some((x) => x.id === c.id || x.name === c.name)) {
+            if (mergedCustoms.length < MAX_CUSTOMS) {
+              mergedCustoms.push(c);
+            }
+          }
+        }
+        S.customSettings = mergedCustoms;
+      }
+
+      // Restore UI flags
+      S.loop = !!uiSettings.loop;
+      if (els.btnLoop) {
+        els.btnLoop.classList.toggle('active-loop', S.loop);
+        els.btnLoop.setAttribute('aria-pressed', S.loop ? 'true' : 'false');
+      }
+      if ([1, 3, 5, 10].includes(uiSettings.skipIntervalSec)) {
+        S.skipIntervalSec = uiSettings.skipIntervalSec;
+        if (els.skipInterval) els.skipInterval.value = String(S.skipIntervalSec);
+      }
+      if (uiSettings.lastExportFormat === 'wav' || uiSettings.lastExportFormat === 'mp3') {
+        S.lastExportFormat = uiSettings.lastExportFormat;
+        if (els.exportPref) els.exportPref.value = S.lastExportFormat;
+      }
+      S.advancedLabExpanded = !!uiSettings.advancedLabExpanded;
+      if (els.labDetails) els.labDetails.open = S.advancedLabExpanded;
+      if (uiSettings.micLevel) S.micLevel = clampNum(uiSettings.micLevel, 1, 12, defaultMicLevel());
+      if (uiSettings.inputGain) S.inputGain = clampNum(uiSettings.inputGain, 0.5, 9, defaultInputGain());
+      syncGainSlidersUI();
+
+      if (uiSettings.recMode === 'standalone' || uiSettings.recMode === 'append') {
+        S.recMode = uiSettings.recMode;
+        if (S.recMode === 'append' && els.recModeAppend) els.recModeAppend.checked = true;
+        else if (els.recModeStandalone) els.recModeStandalone.checked = true;
+      }
+
+      // Restore Audio Buffers & Recording History
+      ensureAudioCtx();
+      await audioCtx.resume().catch(() => {});
+
+      const meta = projectDoc.metadata || {};
+      S.sourceName = meta.sourceName || meta.name || projectDoc.name || 'Restored Project';
+
+      clearHistory();
+      clearRecordHistory();
+
+      const audioData = projectDoc.audio;
+      let restoredBuf = null;
+      let restoredOrig = null;
+
+      if (audioData && audioData.hasAudio) {
+        // Decode takes
+        if (Array.isArray(audioData.takes) && audioData.takes.length > 0) {
+          for (const take of audioData.takes) {
+            if (!take.wavBase64) continue;
+            try {
+              const ab = base64ToArrayBuffer(take.wavBase64);
+              const decoded = await safeDecodeAudioData(audioCtx, ab);
+              const mono = toMonoBuffer(decoded);
+              recordHistory.push({
+                id: String(take.id || uid()),
+                name: String(take.name || 'Take'),
+                buffer: mono,
+                duration: mono.duration,
+                sampleRate: mono.sampleRate,
+                createdAt: Number(take.createdAt) || Date.now()
+              });
+            } catch (e) {
+              console.warn('Failed to decode take:', take.name, e);
+            }
+          }
+        }
+
+        // Decode current working buffer
+        if (audioData.current && audioData.current.wavBase64) {
+          try {
+            const ab = base64ToArrayBuffer(audioData.current.wavBase64);
+            const decoded = await safeDecodeAudioData(audioCtx, ab);
+            restoredBuf = toMonoBuffer(decoded);
+          } catch (e) {
+            console.warn('Failed to decode current audio:', e);
+          }
+        }
+
+        // Decode original buffer
+        if (audioData.original && audioData.original.wavBase64) {
+          try {
+            const ab = base64ToArrayBuffer(audioData.original.wavBase64);
+            const decoded = await safeDecodeAudioData(audioCtx, ab);
+            restoredOrig = toMonoBuffer(decoded);
+          } catch (e) {
+            console.warn('Failed to decode original audio:', e);
+          }
+        }
+
+        // Fallbacks if current/original not specified directly but takes exist
+        if (!restoredBuf && recordHistory.length > 0) {
+          const idx = clampNum(meta.recordHistoryIndex, 0, recordHistory.length - 1, recordHistory.length - 1);
+          restoredBuf = cloneBuffer(recordHistory[idx].buffer);
+        }
+        if (!restoredOrig && restoredBuf) {
+          restoredOrig = cloneBuffer(restoredBuf);
+        }
+
+        takeCounter = meta.takeCounter || recordHistory.length;
+        recordHistoryIndex = clampNum(meta.recordHistoryIndex, 0, Math.max(0, recordHistory.length - 1), recordHistory.length - 1);
+
+        if (restoredBuf) {
+          S.buffer = restoredBuf;
+          S.originalBuffer = restoredOrig || cloneBuffer(restoredBuf);
+          S.previewBuf = null;
+          S.peakPyramid = buildPeakPyramid(restoredBuf);
+          S.waveZoom = uiSettings.waveZoom || 1;
+          S.waveViewStart = uiSettings.waveViewStart || 0;
+          S.playhead = 0;
+          els.waveEmpty.classList.add('hidden');
+          if (els.sourceMeta) {
+            els.sourceMeta.textContent = S.sourceName + ' · mono · ' + fmtTime(restoredBuf.duration, false) + ' · ' + restoredBuf.sampleRate + ' Hz';
+          }
+        } else {
+          S.buffer = null;
+          S.originalBuffer = null;
+          S.peakPyramid = null;
+          els.waveEmpty.classList.remove('hidden');
+          if (els.sourceMeta) els.sourceMeta.textContent = '';
+        }
+      } else {
+        S.buffer = null;
+        S.originalBuffer = null;
+        S.peakPyramid = null;
+        takeCounter = 0;
+        recordHistoryIndex = -1;
+        els.waveEmpty.classList.remove('hidden');
+        if (els.sourceMeta) els.sourceMeta.textContent = '';
+      }
+
+      rebuildFxPanel();
+      renderPresets();
+      updateChainBar();
+      updateUndoButtons();
+      updateRecordHistoryUI();
+      updateTransportEnabled();
+      updateTimeChip();
+      resizeWave();
+      drawWave();
+      schedulePersist();
+
+      const projDisplayName = meta.name || projectDoc.name || 'Project';
+      const takesNote = recordHistory.length ? (' (' + recordHistory.length + ' take' + (recordHistory.length === 1 ? '' : 's') + ')') : '';
+      toast('Restored ' + projDisplayName + takesNote, 'ok');
+    }
+
+    async function exportProjectFile(name) {
+      try {
+        const snap = await createProjectSnapshot(name);
+        const fileName = (snap.name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 50) || 'voxclip-project') + '.voxproject';
+        const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+        downloadBlob(blob, fileName);
+        toast('Exported project: ' + snap.name, 'ok');
+        return true;
+      } catch (e) {
+        console.error(e);
+        toast('Failed to export project: ' + e.message, 'error');
+        return false;
+      }
+    }
+
+    async function saveCurrentProjectToBrowser(name) {
+      try {
+        const snap = await createProjectSnapshot(name);
+        await saveProjectToDb(snap);
+        toast('Saved project to browser library: ' + snap.name, 'ok');
+        await renderSavedProjectsList();
+        return true;
+      } catch (e) {
+        console.error(e);
+        toast('Failed to save to browser: ' + e.message, 'error');
+        return false;
+      }
+    }
+
+    async function renderSavedProjectsList() {
+      if (!els.savedProjectsList) return;
+      try {
+        const list = await listProjectsFromDb();
+        els.savedProjectsList.replaceChildren();
+        if (!list || list.length === 0) {
+          if (els.savedProjectsEmpty) els.savedProjectsEmpty.hidden = false;
+          return;
+        }
+        if (els.savedProjectsEmpty) els.savedProjectsEmpty.hidden = true;
+
+        for (const p of list) {
+          const card = document.createElement('div');
+          card.className = 'saved-project-card';
+
+          const head = document.createElement('div');
+          head.className = 'saved-project-header';
+          const title = document.createElement('span');
+          title.className = 'saved-project-title';
+          title.textContent = p.name || 'Untitled Project';
+          head.appendChild(title);
+
+          const meta = document.createElement('div');
+          meta.className = 'saved-project-meta';
+          const time = document.createElement('span');
+          const d = new Date(p.updatedAt || p.createdAt || Date.now());
+          time.textContent = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const takes = document.createElement('span');
+          const tCount = (p.audio && p.audio.takes) ? p.audio.takes.length : (p.metadata ? p.metadata.totalTakes : 0);
+          takes.textContent = (tCount || 0) + (tCount === 1 ? ' take' : ' takes');
+          const dur = document.createElement('span');
+          const dSec = (p.audio && p.audio.duration) || (p.metadata && p.metadata.duration) || 0;
+          dur.textContent = fmtTime(dSec, false);
+          meta.append(time, document.createTextNode(' · '), takes, document.createTextNode(' · '), dur);
+
+          const actions = document.createElement('div');
+          actions.className = 'saved-project-actions';
+
+          const btnLoad = document.createElement('button');
+          btnLoad.type = 'button';
+          btnLoad.className = 'btn-primary btn-xs';
+          btnLoad.textContent = 'Load';
+          btnLoad.onclick = async () => {
+            hideModal(els.projectModal);
+            await restoreProjectFromData(p);
+          };
+
+          const btnExport = document.createElement('button');
+          btnExport.type = 'button';
+          btnExport.className = 'btn-xs';
+          btnExport.textContent = '⬇ Export';
+          btnExport.onclick = () => {
+            const fileName = (p.name.replace(/[\\/:*?"<>|]/g, '_').slice(0, 50) || 'voxclip-project') + '.voxproject';
+            const blob = new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' });
+            downloadBlob(blob, fileName);
+            toast('Exported ' + p.name, 'ok');
+          };
+
+          const btnDel = document.createElement('button');
+          btnDel.type = 'button';
+          btnDel.className = 'btn-danger btn-xs';
+          btnDel.textContent = '🗑 Delete';
+          btnDel.onclick = async () => {
+            if (!confirm('Delete project “' + p.name + '” from this browser?')) return;
+            await deleteProjectFromDb(p.id);
+            toast('Deleted ' + p.name, 'ok');
+            renderSavedProjectsList();
+          };
+
+          actions.append(btnLoad, btnExport, btnDel);
+          card.append(head, meta, actions);
+          els.savedProjectsList.appendChild(card);
+        }
+      } catch (e) {
+        console.warn('Failed to render projects list:', e);
+      }
+    }
+
+    function openProjectModal(tab = 'save') {
+      if (tab === 'restore') {
+        if (els.tabProjectSave) {
+          els.tabProjectSave.classList.remove('active');
+          els.tabProjectSave.setAttribute('aria-selected', 'false');
+        }
+        if (els.tabProjectRestore) {
+          els.tabProjectRestore.classList.add('active');
+          els.tabProjectRestore.setAttribute('aria-selected', 'true');
+        }
+        if (els.panelProjectSave) els.panelProjectSave.hidden = true;
+        if (els.panelProjectRestore) els.panelProjectRestore.hidden = false;
+        renderSavedProjectsList();
+      } else {
+        if (els.tabProjectRestore) {
+          els.tabProjectRestore.classList.remove('active');
+          els.tabProjectRestore.setAttribute('aria-selected', 'false');
+        }
+        if (els.tabProjectSave) {
+          els.tabProjectSave.classList.add('active');
+          els.tabProjectSave.setAttribute('aria-selected', 'true');
+        }
+        if (els.panelProjectRestore) els.panelProjectRestore.hidden = true;
+        if (els.panelProjectSave) els.panelProjectSave.hidden = false;
+
+        const defaultName = S.sourceName ? (S.sourceName.startsWith('Take') || S.sourceName.startsWith('Recording') ? ('Project ' + S.sourceName) : S.sourceName) : ('My Voice Project ' + new Date().toISOString().slice(0, 10));
+        if (els.projectNameInput) {
+          els.projectNameInput.value = defaultName;
+          setTimeout(() => {
+            els.projectNameInput.focus();
+            els.projectNameInput.select();
+          }, 50);
+        }
+        if (els.projectSaveSummary) {
+          const takesCount = recordHistory.length;
+          const durStr = S.buffer ? fmtTime(S.buffer.duration, false) : '0:00';
+          const chainNames = getPresetChainItems(S.presetChain).map((c) => c.fullName).join(' → ') || 'No preset chain';
+          els.projectSaveSummary.innerHTML = `<strong>Current Project Snapshot:</strong><br />` +
+            `• Audio: ${S.buffer ? (takesCount + ' take' + (takesCount === 1 ? '' : 's') + ' (' + durStr + ')') : 'No audio loaded'}<br />` +
+            `• Preset Chain: ${escapeHtml(chainNames)}<br />` +
+            `• Custom Voices: ${S.customSettings.length} preset${S.customSettings.length === 1 ? '' : 's'}`;
+        }
+      }
+      showModal(els.projectModal);
+    }
+
+    /* =========================================================
        Modals
        ========================================================= */
     let modalOpener = null;
@@ -3461,7 +4009,7 @@
        Keyboard
        ========================================================= */
     function onKey(e) {
-      const modalOpen = [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal]
+      const modalOpen = [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal, els.projectModal]
         .filter(Boolean)
         .find((m) => m.classList.contains('show'));
       if (modalOpen) {
@@ -3477,6 +4025,16 @@
       const activatable = tag === 'button' || tag === 'a' || (e.target && e.target.getAttribute && e.target.getAttribute('role') === 'button');
       if (e.defaultPrevented) return;
       const k = e.key;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === 's' || k === 'S')) {
+        e.preventDefault();
+        openProjectModal('save');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === 'o' || k === 'O')) {
+        e.preventDefault();
+        openProjectModal('restore');
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (k === 'z' || k === 'Z')) {
         e.preventDefault();
         if (e.shiftKey) redoFx();
@@ -3863,6 +4421,50 @@
       if (els.packConfirm) els.packConfirm.addEventListener('click', () => applyPackImport());
       els.btnClearSaved.addEventListener('click', clearAllSaved);
 
+      // Project Manager wiring
+      if (els.btnProject) els.btnProject.addEventListener('click', () => openProjectModal('save'));
+      if (els.btnSaveProject) els.btnSaveProject.addEventListener('click', () => openProjectModal('save'));
+      if (els.btnRestoreProject) els.btnRestoreProject.addEventListener('click', () => openProjectModal('restore'));
+      if (els.tabProjectSave) els.tabProjectSave.addEventListener('click', () => openProjectModal('save'));
+      if (els.tabProjectRestore) els.tabProjectRestore.addEventListener('click', () => openProjectModal('restore'));
+      if (els.btnExportProjectFile) {
+        els.btnExportProjectFile.addEventListener('click', async () => {
+          const name = els.projectNameInput ? els.projectNameInput.value : '';
+          await exportProjectFile(name);
+        });
+      }
+      if (els.btnSaveProjectDb) {
+        els.btnSaveProjectDb.addEventListener('click', async () => {
+          const name = els.projectNameInput ? els.projectNameInput.value : '';
+          await saveCurrentProjectToBrowser(name);
+        });
+      }
+      if (els.projectNameInput) {
+        els.projectNameInput.addEventListener('keydown', async (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            await saveCurrentProjectToBrowser(els.projectNameInput.value);
+          }
+        });
+      }
+      if (els.btnOpenProjectFile) {
+        els.btnOpenProjectFile.addEventListener('click', () => {
+          if (els.projectFileInput) els.projectFileInput.click();
+        });
+      }
+      if (els.projectFileInput) {
+        els.projectFileInput.addEventListener('change', async () => {
+          const f = els.projectFileInput.files && els.projectFileInput.files[0];
+          els.projectFileInput.value = '';
+          if (!f) return;
+          hideModal(els.projectModal);
+          await loadFile(f);
+        });
+      }
+      if (els.projectModalClose) {
+        els.projectModalClose.addEventListener('click', () => hideModal(els.projectModal));
+      }
+
       els.labDetails.addEventListener('toggle', () => {
         S.advancedLabExpanded = els.labDetails.open;
         schedulePersist();
@@ -3893,7 +4495,7 @@
       window.addEventListener('offline', updateOnline);
 
       // Backdrop click closes modals
-      [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal].forEach((m) => {
+      [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal, els.projectModal].forEach((m) => {
         if (!m) return;
         m.addEventListener('click', (e) => {
           if (e.target === m) hideModal(m);
