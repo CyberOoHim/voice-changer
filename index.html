@@ -148,7 +148,49 @@
 
     .source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
     @media (min-width: 640px) {
-      .source-actions { grid-template-columns: auto auto 1fr; align-items: center; }
+      .source-actions { grid-template-columns: auto auto auto auto 1fr; align-items: center; }
+    }
+    .btn-rec-history {
+      font-size: .84rem;
+      background: rgba(15, 23, 32, 0.7);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-rec-history:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .rec-history-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 4px;
+      margin-bottom: 10px;
+      padding: 5px 12px;
+      background: rgba(15, 23, 32, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .78rem;
+    }
+    .rec-take-badge {
+      font-weight: 700;
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .rec-take-badge::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .rec-take-hint {
+      color: var(--muted);
+      font-size: .72rem;
     }
 
     .dropzone {
@@ -910,7 +952,13 @@
       <div class="source-actions">
         <button type="button" id="btnRecord" class="btn-primary btn-rec" aria-label="Record from microphone">● Record</button>
         <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
+        <button type="button" id="btnUndoRecord" class="btn-rec-history" disabled aria-label="Undo recording take" title="Undo recording take (Alt+Z)">↶ Undo Rec</button>
+        <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
         <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v" />
+      </div>
+      <div id="recHistoryBar" class="rec-history-bar" hidden>
+        <span id="recTakeBadge" class="rec-take-badge" aria-live="polite">Take 1 of 1</span>
+        <span class="rec-take-hint">FIFO buffer · max 10 takes</span>
       </div>
       <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio or video files here">
         <strong>Drop audio or video</strong>

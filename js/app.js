@@ -365,6 +365,8 @@
     const MAX_UNDO = 50;
     /** Max AudioBuffer clones kept across undo+redo (memory guard) */
     const MAX_BUFFER_SNAPSHOTS = 10;
+    /** Max recording history buffer length (FIFO) */
+    const MAX_RECORD_HISTORY = 10;
 
     const S = {
       buffer: null,
@@ -434,6 +436,10 @@
     let undoStack = [];
     let redoStack = [];
     let historySuspended = false;
+    /** Recording history (FIFO queue of max 10 takes) */
+    let recordHistory = [];
+    let recordHistoryIndex = -1;
+    let takeCounter = 0;
     let edgeToastAt = 0;
     let lameLoading = null;
     let longPressTimer = 0;
@@ -446,6 +452,10 @@
     const els = {
       btnRecord: $('btnRecord'),
       btnUpload: $('btnUpload'),
+      btnUndoRecord: $('btnUndoRecord'),
+      btnRedoRecord: $('btnRedoRecord'),
+      recHistoryBar: $('recHistoryBar'),
+      recTakeBadge: $('recTakeBadge'),
       fileInput: $('fileInput'),
       dropzone: $('dropzone'),
       meterWrap: $('meterWrap'),
@@ -872,6 +882,7 @@
       setPresetTab(S.presetsSection, false);
       updateChainBar();
       updateUndoButtons();
+      updateRecordHistoryUI();
     }
 
     /* =========================================================
@@ -1072,6 +1083,96 @@
       while (undoStack.length) releaseSnap(undoStack.pop());
       while (redoStack.length) releaseSnap(redoStack.pop());
       updateUndoButtons();
+    }
+
+    /* =========================================================
+       Recording History (FIFO buffer, max 10 takes)
+       ========================================================= */
+    function updateRecordHistoryUI() {
+      const hasHistory = recordHistory.length > 0;
+      const canUndo = recordHistoryIndex > 0;
+      const canRedo = recordHistoryIndex >= 0 && recordHistoryIndex < recordHistory.length - 1;
+      const isBusy = S.baking || S.recording || S.loading;
+
+      if (els.btnUndoRecord) {
+        els.btnUndoRecord.disabled = !canUndo || isBusy;
+        els.btnUndoRecord.title = canUndo
+          ? 'Undo to ' + (recordHistory[recordHistoryIndex - 1] ? recordHistory[recordHistoryIndex - 1].name : ('Take ' + recordHistoryIndex)) + ' (Alt+Z)'
+          : 'Undo recording take (Alt+Z)';
+      }
+      if (els.btnRedoRecord) {
+        els.btnRedoRecord.disabled = !canRedo || isBusy;
+        els.btnRedoRecord.title = canRedo
+          ? 'Redo to ' + (recordHistory[recordHistoryIndex + 1] ? recordHistory[recordHistoryIndex + 1].name : ('Take ' + (recordHistoryIndex + 2))) + ' (Alt+Y)'
+          : 'Redo recording take (Alt+Y)';
+      }
+      if (els.recHistoryBar) {
+        els.recHistoryBar.hidden = !hasHistory;
+      }
+      if (els.recTakeBadge && hasHistory && recordHistoryIndex >= 0) {
+        const activeTake = recordHistory[recordHistoryIndex];
+        const label = activeTake ? activeTake.name : ('Take ' + (recordHistoryIndex + 1));
+        els.recTakeBadge.textContent = label + ' (' + (recordHistoryIndex + 1) + '/' + recordHistory.length + ')';
+      }
+    }
+
+    function pushRecordTake(buf, meta = {}) {
+      if (!buf) return;
+      takeCounter++;
+      // If user had undone to an earlier take, discard future redo branch
+      if (recordHistoryIndex >= 0 && recordHistoryIndex < recordHistory.length - 1) {
+        recordHistory = recordHistory.slice(0, recordHistoryIndex + 1);
+      }
+      const takeName = meta.name || ('Take ' + takeCounter);
+      const entry = {
+        id: uid(),
+        name: takeName,
+        buffer: cloneBuffer(buf),
+        duration: buf.duration,
+        sampleRate: buf.sampleRate,
+        createdAt: Date.now()
+      };
+      recordHistory.push(entry);
+      // FIFO eviction: remove oldest take when buffer length exceeds max (10)
+      while (recordHistory.length > MAX_RECORD_HISTORY) {
+        recordHistory.shift();
+      }
+      recordHistoryIndex = recordHistory.length - 1;
+      updateRecordHistoryUI();
+    }
+
+    function undoRecording() {
+      if (recordHistoryIndex <= 0 || !recordHistory.length || S.recording || S.baking) return;
+      recordHistoryIndex--;
+      const target = recordHistory[recordHistoryIndex];
+      if (!target || !target.buffer) return;
+      setBuffer(cloneBuffer(target.buffer), {
+        name: target.name,
+        clearVideo: true,
+        fromRecHistory: true
+      });
+      updateRecordHistoryUI();
+      toast('Restored ' + target.name + ' (' + (recordHistoryIndex + 1) + '/' + recordHistory.length + ')', 'ok');
+    }
+
+    function redoRecording() {
+      if (recordHistoryIndex < 0 || recordHistoryIndex >= recordHistory.length - 1 || S.recording || S.baking) return;
+      recordHistoryIndex++;
+      const target = recordHistory[recordHistoryIndex];
+      if (!target || !target.buffer) return;
+      setBuffer(cloneBuffer(target.buffer), {
+        name: target.name,
+        clearVideo: true,
+        fromRecHistory: true
+      });
+      updateRecordHistoryUI();
+      toast('Restored ' + target.name + ' (' + (recordHistoryIndex + 1) + '/' + recordHistory.length + ')', 'ok');
+    }
+
+    function clearRecordHistory() {
+      recordHistory = [];
+      recordHistoryIndex = -1;
+      updateRecordHistoryUI();
     }
 
     /* =========================================================
@@ -1913,6 +2014,7 @@
       }
       els.bakeOverlay.classList.toggle('show', S.baking);
       if (els.dropzone) els.dropzone.classList.toggle('busy', S.loading);
+      updateRecordHistoryUI();
     }
 
     /* =========================================================
@@ -2211,16 +2313,11 @@
           toast('Recording too short — try again.', 'error');
           return;
         }
-        // Replace confirm after stop+normalize (PRD §19.5)
-        if (S.buffer) {
-          const ok = confirm('Replace current audio with this recording? Your current clip will be discarded.');
-          if (!ok) {
-            toast('Recording discarded');
-            return;
-          }
-        }
-        setBuffer(mono, { name: 'Recording', clearVideo: true });
-        toast('Recording ready', 'ok');
+        pushRecordTake(mono);
+        const curTake = recordHistory[recordHistoryIndex];
+        const takeLabel = curTake ? curTake.name : ('Take ' + takeCounter);
+        setBuffer(mono, { name: 'Recording (' + takeLabel + ')', clearVideo: true, fromRecHistory: true });
+        toast('Recording ready (' + takeLabel + ')', 'ok');
       } catch (e) {
         console.error(e);
         toast("Couldn't process recording. Try again.", 'error');
@@ -3138,10 +3235,13 @@
       S.playhead = 0;
       S.sourceName = '';
       clearHistory();
+      clearRecordHistory();
+      takeCounter = 0;
       revokeVideo();
       els.waveEmpty.classList.remove('hidden');
       if (els.sourceMeta) els.sourceMeta.textContent = '';
       updateUndoButtons();
+      updateRecordHistoryUI();
       updateTransportEnabled();
       updateTimeChip();
       drawWave();
@@ -3166,6 +3266,8 @@
       S.activeCustomId = null;
       S.sourceName = '';
       clearHistory();
+      clearRecordHistory();
+      takeCounter = 0;
       revokeVideo();
       els.waveEmpty.classList.remove('hidden');
       els.sourceMeta.textContent = '';
@@ -3173,6 +3275,7 @@
       renderPresets();
       updateChainBar();
       updateUndoButtons();
+      updateRecordHistoryUI();
       updateTransportEnabled();
       updateTimeChip();
       drawWave();
@@ -3310,6 +3413,17 @@
         redoFx();
         return;
       }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (k === 'z' || k === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) redoRecording();
+        else undoRecording();
+        return;
+      }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && (k === 'y' || k === 'Y')) {
+        e.preventDefault();
+        redoRecording();
+        return;
+      }
       if (k === ' ' || k === 'Spacebar') {
         if (activatable) return;
         e.preventDefault();
@@ -3368,6 +3482,8 @@
        ========================================================= */
     function wire() {
       els.btnRecord.addEventListener('click', toggleRecord);
+      if (els.btnUndoRecord) els.btnUndoRecord.addEventListener('click', undoRecording);
+      if (els.btnRedoRecord) els.btnRedoRecord.addEventListener('click', redoRecording);
       els.btnUpload.addEventListener('click', () => els.fileInput.click());
       els.fileInput.addEventListener('change', () => {
         const f = els.fileInput.files && els.fileInput.files[0];
