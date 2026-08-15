@@ -13,7 +13,9 @@ Browser-native **voice changer** (PWA). Record or upload voice, chain presets, t
 ### Capture & source
 - **Record** from the mic (desktop, iPad/Safari, Android Chrome)
 - **Mic level** slider (1×–12×) — live gain into `MediaRecorder` when supported; also applied post-stop if needed
-- **Input gain** slider (0.5×–9×) — playback/export make-up gain **before** Advanced Lab **FX gain** (cascaded: `inputGain × fx.gain`)
+- **3-2-1 record countdown** and a **max recording length** setting (1–10 min)
+- **Input gain** slider (0.5×–9×) — playback/export make-up gain **before** Advanced Lab **FX gain** (cascaded: `inputGain × fx.gain`); included in export/Apply FX
+- **Match loudness** — sets Input gain from RMS/peak so quiet clips export at the same level you hear
 - **Quiet-mic normalize** for iPhone/iPad/Safari: peak target **0.95**, max **32×**, skip if peak ≥ **0.90**; second-pass boost if still quiet
 - Defaults favor quiet devices (higher mic level / input gain on iOS/Safari)
 - **Upload / drag-drop** audio or video: WAV, MP3, AAC, M4A, **MP4**, MOV, WebM, …
@@ -22,9 +24,10 @@ Browser-native **voice changer** (PWA). Record or upload voice, chain presets, t
 - Replace confirm when a buffer already exists
 
 ### Preview & transport
-- Live **waveform** with click/tap seek
+- Live **waveform** with click/tap seek, **zoom**, and a cached peak pyramid
 - Play / Pause / Stop / Loop
-- Skip −10 / −5 / +5 / +10 (mobile overflow menu for ±10)
+- **A/B dry vs wet** (hold or toggle)
+- Skip uses the Settings interval (Shift still ±10; mobile overflow menu for ±10)
 - Frame ◀ / ▶ when video-origin
 - Keyboard: Space, ←/→, J/L, Home/End, `,` / `.` (frames), **Ctrl/Cmd+Z** undo, **Ctrl/Cmd+Y** / **Shift+Z** redo
 
@@ -39,10 +42,13 @@ Browser-native **voice changer** (PWA). Record or upload voice, chain presets, t
 - **Chain up to 3 presets** in click order → blended into **Advanced Lab** sliders  
   - Badges **1 / 2 / 3**, chain bar, rolling window (4th unique drop oldest)  
   - Tap a chained card or any step in the chain bar to remove that slot
-- Full **Advanced Lab**: pitch/formant, speed, crush, filters, reverb/delay, modulation, dynamics
+- Full **Advanced Lab**: **independent pitch** (duration-preserving) vs **speed**, formant, crush/fades (live + export), filters, reverb/delay, modulation, dynamics
 - **Apply FX** — offline bake into the working buffer (WYSIWYE); resets lab to defaults after bake
+- **Preset search** + **recent** chips (built-in library unchanged)
+- Chain slots can be **drag-reordered** with a **per-slot mix**
 - **Reset FX** — restores **original** record/upload audio + clears FX/chain (not only slider defaults)
-- **Custom settings** — save / load / rename / overwrite / delete (max 50), import/export JSON
+- **Custom settings** — save / load / rename / overwrite / delete (max 50)
+- **Custom packs** — versioned JSON export/import with skip / replace / keep-both on conflicts
 
 ### Undo / redo (session only)
 - Tracks **FX + preset chain + input gain**
@@ -52,9 +58,10 @@ Browser-native **voice changer** (PWA). Record or upload voice, chain presets, t
 - Cleared on new record/upload / Reset Project
 
 ### Export & PWA
-- **Export WAV** (always available)
-- **Export MP3** via lazy-loaded lamejs (CDN; graceful toast offline)
-- Service worker + web manifest → installable / offline shell
+- **Export WAV** (always available); **Export MP3** via same-origin `vendor/lame.min.js`
+- Primary export button follows Settings → default format
+- **Share** the last export when the browser supports Web Share
+- Service worker + web manifest → installable / offline shell; toast when a new version is ready
 - Dark studio UI, large touch targets, safe-area padding
 
 ---
@@ -96,15 +103,17 @@ All asset paths are **relative** (`./sw.js`, `./manifest.webmanifest`, `./icons/
 
 | Path | Role |
 |------|------|
-| `index.html` | Full app (UI, Web Audio, FX, persistence) |
+| `index.html` | App shell (markup + CSS) |
+| `js/app.js` | UI, ingest, transport, presets, persistence |
+| `js/fx-engine.js` | Buffer ops, independent pitch, FX graph, WAV |
+| `vendor/lame.min.js` | Same-origin MP3 encoder |
 | `fx-presets.json` | Standalone built-in voice FX presets dataset & metadata |
 | `sw.js` | Service worker (precache + network/cache) |
 | `manifest.webmanifest` | PWA install metadata |
 | `icons/` | `icon-192.png`, `icon-512.png`, maskable |
 | `.nojekyll` | Disable Jekyll on Pages |
 | `README.md` | This file |
-| `voxclip-studio-prd-v3.0.md` | Product requirements (source of truth for product rules) |
-| `voxclip-studio-prd-v2.2.md` | Prior PRD (reference) |
+| `docs/voxclip-studio-prd-v3.0.md` | Product requirements |
 
 ---
 

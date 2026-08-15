@@ -1,10 +1,13 @@
 /* VoxClip Studio service worker — GitHub Pages friendly (relative scope) */
-const CACHE = 'voxclip-studio-v3-2';
+const CACHE = 'voxclip-studio-v3-3';
 const PRECACHE = [
   './',
   './index.html',
   './fx-presets.json',
   './manifest.webmanifest',
+  './vendor/lame.min.js',
+  './js/fx-engine.js',
+  './js/app.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
@@ -45,8 +48,12 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => cached);
 
-      // Network-first for HTML (fresh app), cache-first fallback for assets
-      if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+      const networkFirst = req.mode === 'navigate' ||
+        url.pathname.endsWith('.html') ||
+        url.pathname.endsWith('/') ||
+        url.pathname.endsWith('.json') ||
+        url.pathname.endsWith('.webmanifest');
+      if (networkFirst) {
         return network.then((r) => r || cached || caches.match('./index.html'));
       }
       return cached || network;
