@@ -1514,6 +1514,31 @@
       els.btnPlay.setAttribute('aria-label', S.playing ? 'Pause' : 'Play');
     }
 
+    function setDry(on, notify = false) {
+      if (!S.buffer || S.baking) {
+        S.comparingDry = false;
+        if (els.btnAB) {
+          els.btnAB.classList.remove('active', 'active-ab');
+          els.btnAB.setAttribute('aria-pressed', 'false');
+          els.btnAB.title = 'Toggle dry / wet comparison (hear original)';
+        }
+        return;
+      }
+      S.comparingDry = !!on;
+      if (els.btnAB) {
+        els.btnAB.classList.toggle('active', S.comparingDry);
+        els.btnAB.classList.toggle('active-ab', S.comparingDry);
+        els.btnAB.setAttribute('aria-pressed', String(S.comparingDry));
+        els.btnAB.title = S.comparingDry
+          ? 'Original dry audio active — click to switch back to FX (wet)'
+          : 'Toggle dry / wet comparison (hear original)';
+      }
+      if (S.playing) startPlayback();
+      if (notify) {
+        toast(S.comparingDry ? 'A/B: Auditioning DRY (original audio)' : 'A/B: Auditioning WET (FX active)', 'ok');
+      }
+    }
+
     function startPlayback() {
       if (!S.buffer || S.baking) return;
       const ctx = ensureAudioCtx();
@@ -1878,6 +1903,9 @@
       els.btnApplyFx.disabled = !has || !isFxWet();
       els.btnRecord.disabled = S.baking || S.loading || !S.recordSupport;
       els.btnUpload.disabled = S.baking || S.loading;
+      if (!has && S.comparingDry) {
+        setDry(false, false);
+      }
       if (els.btnShare) {
         const canShare = !!(S.lastExportBlob && navigator.share);
         els.btnShare.hidden = !canShare;
@@ -2357,6 +2385,7 @@
 
     async function applyFxBake() {
       if (!S.buffer || S.baking || !isFxWet()) return;
+      setDry(false, false);
       S.baking = true;
       updateTransportEnabled();
       stopPlayback(false);
@@ -3103,6 +3132,7 @@
       }
       stopPlayback(true);
       if (S.recording) stopRecording();
+      setDry(false, false);
       S.buffer = null;
       S.originalBuffer = null;
       S.playhead = 0;
@@ -3125,6 +3155,7 @@
     function resetProject() {
       stopPlayback(true);
       if (S.recording) stopRecording();
+      setDry(false, false);
       S.buffer = null;
       S.originalBuffer = null;
       S.playhead = 0;
@@ -3152,6 +3183,7 @@
     function clearAllSaved() {
       if (!confirm('Clear all saved settings, preferences, and custom voices on this device?')) return;
       try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+      setDry(false, false);
       S.customSettings = [];
       S.fx = defaultFx();
       S.presetChain = [];
@@ -3442,18 +3474,9 @@
       els.btnApplyFx.addEventListener('click', applyFxBake);
       els.btnResetFx.addEventListener('click', resetFx);
       if (els.btnAB) {
-        const setDry = (on) => {
+        els.btnAB.addEventListener('click', () => {
           if (!S.buffer || S.baking) return;
-          S.comparingDry = !!on;
-          els.btnAB.classList.toggle('active', S.comparingDry);
-          els.btnAB.setAttribute('aria-pressed', String(S.comparingDry));
-          if (S.playing) startPlayback();
-        };
-        els.btnAB.addEventListener('pointerdown', () => setDry(true));
-        els.btnAB.addEventListener('pointerup', () => setDry(false));
-        els.btnAB.addEventListener('pointerleave', () => { if (S.comparingDry) setDry(false); });
-        els.btnAB.addEventListener('click', (e) => {
-          if (e.detail === 0) setDry(!S.comparingDry);
+          setDry(!S.comparingDry, true);
         });
       }
       if (els.btnMatchLoudness) els.btnMatchLoudness.addEventListener('click', matchLoudness);

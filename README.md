@@ -26,7 +26,7 @@ Browser-native **voice changer** (PWA). Record or upload voice, chain presets, t
 ### Preview & transport
 - Live **waveform** with click/tap seek, **zoom**, and a cached peak pyramid
 - Play / Pause / Stop / Loop
-- **A/B dry vs wet** (hold or toggle)
+- **A/B dry vs wet** (click to toggle with visible status indicator)
 - Skip uses the Settings interval (Shift still ±10; mobile overflow menu for ±10)
 - Frame ◀ / ▶ when video-origin
 - Keyboard: Space, ←/→, J/L, Home/End, `,` / `.` (frames), **Ctrl/Cmd+Z** undo, **Ctrl/Cmd+Y** / **Shift+Z** redo

@@ -310,6 +310,24 @@
       color: var(--accent2);
       background: rgba(56,189,248,.1);
     }
+    .transport button.active-ab,
+    .transport button#btnAB.active,
+    .transport button#btnAB[aria-pressed="true"],
+    .btn-ab.active {
+      border-color: #f59e0b;
+      color: #fef08a;
+      background: linear-gradient(135deg, rgba(245, 158, 11, .28), rgba(217, 119, 6, .2));
+      box-shadow: 0 0 14px rgba(245, 158, 11, .38), inset 0 0 0 1px rgba(251, 191, 36, .45);
+      font-weight: 700;
+    }
+    .transport button.active-ab:hover:not(:disabled),
+    .transport button#btnAB.active:hover:not(:disabled),
+    .transport button#btnAB[aria-pressed="true"]:hover:not(:disabled),
+    .btn-ab.active:hover:not(:disabled) {
+      background: linear-gradient(135deg, rgba(245, 158, 11, .4), rgba(217, 119, 6, .3));
+      border-color: #fbbf24;
+      color: #ffffff;
+    }
 
     .tabs {
       display: inline-flex;
@@ -776,11 +794,6 @@
       color: var(--muted);
       min-width: 3.2rem;
     }
-    .btn-ab.active {
-      border-color: var(--warn);
-      color: #fde68a;
-      background: rgba(251, 191, 36, .12);
-    }
     .countdown-overlay {
       display: none;
       position: fixed;
@@ -964,7 +977,7 @@
         </span>
         <button type="button" id="btnStop" disabled aria-label="Stop">⏹</button>
         <button type="button" id="btnLoop" disabled aria-label="Loop" aria-pressed="false">Loop</button>
-        <button type="button" id="btnAB" disabled aria-label="Compare dry and wet" aria-pressed="false" title="Hold or toggle to hear original (dry)">A/B</button>
+        <button type="button" id="btnAB" class="btn-ab" disabled aria-label="Compare dry and wet" aria-pressed="false" title="Toggle dry / wet comparison (hear original)">A/B</button>
         <button type="button" id="btnUndo" disabled aria-label="Undo FX change" title="Ctrl+Z">↶ Undo</button>
         <button type="button" id="btnRedo" disabled aria-label="Redo FX change" title="Ctrl+Y">↷ Redo</button>
         <button type="button" id="btnApplyFx" disabled aria-label="Apply FX to clip">Apply FX</button>
