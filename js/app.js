@@ -734,6 +734,7 @@
           fxSourceMode: 'local',
           fxRemoteUrl: '',
           maxRecordSec: 180,
+          recMode: 'standalone',
           recentPresetIds: [],
           presetSearch: '',
           presetCatOpen: Object.fromEntries(PRESET_CATS.map((c) => [c, true]))
@@ -741,6 +742,7 @@
         fx: defaultFx(),
         // dual-chain of built-in preset ids (click order)
         presetChain: [],
+        presetChainMix: [],
         activePresetId: null, // legacy single-select; migrated into presetChain
         activeCustomId: null,
         customSettings: [],
@@ -784,6 +786,8 @@
         if (ui.fxSourceMode !== 'local' && ui.fxSourceMode !== 'github') ui.fxSourceMode = 'local';
         if (typeof ui.fxRemoteUrl !== 'string') ui.fxRemoteUrl = '';
         ui.maxRecordSec = [60, 180, 300, 600].includes(Number(ui.maxRecordSec)) ? Number(ui.maxRecordSec) : 180;
+        ui.recMode = ui.recMode === 'append' ? 'append' : 'standalone';
+        ui.presetsSection = ui.presetsSection === 'custom' ? 'custom' : 'built-in';
         ui.recentPresetIds = Array.isArray(ui.recentPresetIds) ? ui.recentPresetIds.map(String).slice(0, 8) : [];
         ui.presetSearch = typeof ui.presetSearch === 'string' ? ui.presetSearch.slice(0, 40) : '';
         ui.micLevel = clampNum(ui.micLevel, 1, 12, defaultMicLevel());
@@ -833,16 +837,17 @@
       return {
         version: 3,
         ui: {
-          loop: S.loop,
+          loop: !!S.loop,
           skipIntervalSec: S.skipIntervalSec,
           lastExportFormat: S.lastExportFormat,
-          advancedLabExpanded: S.advancedLabExpanded,
-          presetsSection: S.presetsSection,
+          advancedLabExpanded: !!S.advancedLabExpanded,
+          presetsSection: S.presetsSection || 'built-in',
           micLevel: S.micLevel,
           inputGain: S.inputGain,
           fxSourceMode: (S.ui && S.ui.fxSourceMode) || 'local',
           fxRemoteUrl: (S.ui && S.ui.fxRemoteUrl) || '',
           maxRecordSec: (S.ui && S.ui.maxRecordSec) || 180,
+          recMode: S.recMode || (S.ui && S.ui.recMode) || 'standalone',
           recentPresetIds: (S.ui && S.ui.recentPresetIds) ? S.ui.recentPresetIds.slice(0, 8) : [],
           presetSearch: (S.ui && S.ui.presetSearch) || '',
           presetCatOpen: { ...S.presetCatOpen }
@@ -900,6 +905,10 @@
       S.ui.recentPresetIds = Array.isArray(p.ui.recentPresetIds) ? p.ui.recentPresetIds.map(String).slice(0, 8) : [];
       S.ui.presetSearch = typeof p.ui.presetSearch === 'string' ? p.ui.presetSearch : '';
       S.ui.presetCatOpen = S.presetCatOpen;
+      const m = (p.ui && p.ui.recMode) || S.recMode || 'standalone';
+      S.recMode = m === 'append' ? 'append' : 'standalone';
+      S.ui.recMode = S.recMode;
+
       els.btnLoop.classList.toggle('active-loop', S.loop);
       els.btnLoop.setAttribute('aria-pressed', String(S.loop));
       els.labDetails.open = S.advancedLabExpanded;
@@ -907,11 +916,11 @@
       els.exportPref.value = S.lastExportFormat;
       if (els.maxRecordSec) els.maxRecordSec.value = String(S.ui.maxRecordSec);
       if (els.presetSearch) els.presetSearch.value = S.ui.presetSearch;
+      if (els.fxSourceMode) els.fxSourceMode.value = S.ui.fxSourceMode;
+      if (els.fxRemoteUrl) els.fxRemoteUrl.value = S.ui.fxRemoteUrl;
+      if (els.fxRemoteUrlGroup) els.fxRemoteUrlGroup.hidden = (S.ui.fxSourceMode !== 'github');
       if (els.recModeStandalone && els.recModeAppend) {
-        const m = (p.ui && p.ui.recMode) || S.recMode || 'standalone';
-        S.recMode = m;
-        S.ui.recMode = m;
-        if (m === 'append') els.recModeAppend.checked = true;
+        if (S.recMode === 'append') els.recModeAppend.checked = true;
         else els.recModeStandalone.checked = true;
       }
       syncGainSlidersUI();
@@ -2014,6 +2023,7 @@
 
     function setBuffer(buf, meta = {}) {
       stopPlayback(true);
+      setDry(false, false);
       S.buffer = buf;
       S.originalBuffer = buf ? cloneBuffer(buf) : null;
       S.previewBuf = null;
@@ -3286,6 +3296,7 @@
      */
     function resetFx() {
       const wasPlaying = S.playing;
+      setDry(false, false);
       const needsAudioRestore = !!(S.originalBuffer && S.buffer && bufferIsBakedFromOriginal());
       const needsFxReset =
         !fxEqualsDefault(S.fx) ||
@@ -3422,6 +3433,16 @@
       S.presetCatOpen = Object.fromEntries(PRESET_CATS.map((c) => [c, true]));
       S.micLevel = defaultMicLevel();
       S.inputGain = defaultInputGain();
+      S.recMode = 'standalone';
+      S.ui = {
+        fxSourceMode: 'local',
+        fxRemoteUrl: '',
+        maxRecordSec: 180,
+        recMode: 'standalone',
+        recentPresetIds: [],
+        presetSearch: '',
+        presetCatOpen: { ...S.presetCatOpen }
+      };
       undoStack = [];
       redoStack = [];
       els.btnLoop.classList.remove('active-loop');
@@ -3429,6 +3450,13 @@
       els.labDetails.open = false;
       els.skipInterval.value = '5';
       els.exportPref.value = 'wav';
+      if (els.maxRecordSec) els.maxRecordSec.value = '180';
+      if (els.presetSearch) els.presetSearch.value = '';
+      if (els.fxSourceMode) els.fxSourceMode.value = 'local';
+      if (els.fxRemoteUrl) els.fxRemoteUrl.value = '';
+      if (els.fxRemoteUrlGroup) els.fxRemoteUrlGroup.hidden = true;
+      if (els.recModeStandalone) els.recModeStandalone.checked = true;
+      if (els.recModeAppend) els.recModeAppend.checked = false;
       syncGainSlidersUI();
       setPresetTab('built-in', false);
       rebuildFxPanel();
