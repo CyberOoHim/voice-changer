@@ -43,6 +43,10 @@ Browser-native **voice changer and sound design studio** (PWA). Record or upload
     - Custom user preset library and active preset references.
     - UI preferences (recording mode, loop, zoom, skip interval, mic levels, gain).
   - Open `.voxproject` files via drag-and-drop or the file picker with validation and error protection.
+- **Immediate FX Application on Restore**:
+  - Automatically reconstructs the real-time preview buffer (`rebuildPreview`) upon decoding raw audio takes, guaranteeing that pitch shifts, reverse, fades, bitcrush, and DSP chain graphs are instantly audible during playback.
+  - Automatically recomputes FX parameters for preset chains and custom presets if settings require fallback synthesis.
+  - Re-synchronizes gain sliders (both top-level and Advanced Lab), waveform zoom indicators, preset tabs ('built-in' / 'custom'), and search queries, while safely resetting A/B comparison to audition wet FX by default.
 - **In-Browser Project Library (IndexedDB)**:
   - Save, load, export, and delete multiple named projects directly inside the browser (`voxclip_projects` store) without manual file downloads.
 - **Project Manager Modal & Shortcuts**:
@@ -139,7 +143,7 @@ Open `http://localhost:8080` in your browser.
 
 ## Running Automated Tests
 
-VoxClip Studio includes comprehensive unit test suites covering the audio DSP engine, multi-take recording history, append crossfading, and project serialization:
+VoxClip Studio includes comprehensive unit test suites covering the audio DSP engine, multi-take recording history, append crossfading, UI persistence, and project serialization:
 
 ```bash
 # Run all unit tests
@@ -147,9 +151,10 @@ node --test js/*.test.js
 ```
 
 ### Test Suites:
-- `js/fx-engine.test.js`: Audio buffer processing, peak pyramid, normalization, and WAV encoding/decoding.
+- `js/fx-engine.test.js`: Audio buffer processing, peak pyramid, pitch shifting, normalization, and WAV encoding/decoding.
+- `js/local-storage.test.js`: LocalStorage serialization, UI state persistence, safe default fallback sanitization, and A/B dry mode resets.
+- `js/project.test.js`: Project snapshot generation, base64 WAV serialization, IndexedDB mock CRUD, multi-take restoration, and immediate FX preview buffer application to raw audio.
 - `js/recording-history.test.js`: 10-take FIFO stack, undo/redo branching, take deletion, and crossfade append logic.
-- `js/project.test.js`: Project snapshot generation, base64 WAV serialization, IndexedDB mock CRUD, and multi-take restoration.
 
 ---
 
@@ -176,6 +181,7 @@ node --test js/*.test.js
 │   ├── app.js                     # UI controllers, transport, state management, project persistence
 │   ├── fx-engine.js               # Web Audio API DSP graph, pitch shifter, buffer math, WAV encoder
 │   ├── fx-engine.test.js          # Audio engine unit tests
+│   ├── local-storage.test.js      # LocalStorage & UI persistence unit tests
 │   ├── project.test.js            # Project save/restore & IndexedDB unit tests
 │   └── recording-history.test.js  # Recording take history & crossfade append unit tests
 ├── vendor/
