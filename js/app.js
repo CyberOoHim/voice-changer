@@ -3655,16 +3655,17 @@
       const uiSettings = settings.ui || {};
 
       // Restore FX
-      S.fx = mergeFx(settings.fx);
-      S.presetChain = sanitizePresetChain(settings.presetChain);
-      S.presetChainMix = sanitizeChainMix(settings.presetChainMix, S.presetChain.length);
-      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null;
-      S.activeCustomId = settings.activeCustomId || null;
+      S.fx = mergeFx(settings.fx || projectDoc.fx);
+      S.presetChain = sanitizePresetChain(settings.presetChain !== undefined ? settings.presetChain : projectDoc.presetChain);
+      S.presetChainMix = sanitizeChainMix(settings.presetChainMix !== undefined ? settings.presetChainMix : projectDoc.presetChainMix, S.presetChain.length);
+      S.activePresetId = S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : (settings.activePresetId || projectDoc.activePresetId || null);
+      S.activeCustomId = settings.activeCustomId || projectDoc.activeCustomId || null;
 
       // Restore Custom presets if present in project
-      if (Array.isArray(settings.customSettings)) {
+      const rawCustoms = Array.isArray(settings.customSettings) ? settings.customSettings : (Array.isArray(projectDoc.customSettings) ? projectDoc.customSettings : null);
+      if (rawCustoms) {
         const mergedCustoms = [...S.customSettings];
-        for (const c of settings.customSettings) {
+        for (const c of rawCustoms) {
           if (!mergedCustoms.some((x) => x.id === c.id || x.name === c.name)) {
             if (mergedCustoms.length < MAX_CUSTOMS) {
               mergedCustoms.push(c);
@@ -3672,6 +3673,20 @@
           }
         }
         S.customSettings = mergedCustoms;
+      }
+
+      // If activeCustomId was set and custom preset exists, ensure custom settings are active
+      if (fxEqualsDefault(S.fx)) {
+        if (S.activeCustomId) {
+          const c = S.customSettings.find((x) => x.id === S.activeCustomId);
+          if (c && c.fx) {
+            S.fx = mergeFx(c.fx);
+            if (c.presetChain) S.presetChain = sanitizePresetChain(c.presetChain);
+            if (c.presetChainMix) S.presetChainMix = sanitizeChainMix(c.presetChainMix, S.presetChain.length);
+          }
+        } else if (S.presetChain.length > 0) {
+          recomputeFxFromChain();
+        }
       }
 
       // Restore UI flags
@@ -3692,12 +3707,24 @@
       if (els.labDetails) els.labDetails.open = S.advancedLabExpanded;
       if (uiSettings.micLevel) S.micLevel = clampNum(uiSettings.micLevel, 1, 12, defaultMicLevel());
       if (uiSettings.inputGain) S.inputGain = clampNum(uiSettings.inputGain, 0.5, 9, defaultInputGain());
-      syncGainSlidersUI();
 
       if (uiSettings.recMode === 'standalone' || uiSettings.recMode === 'append') {
         S.recMode = uiSettings.recMode;
         if (S.recMode === 'append' && els.recModeAppend) els.recModeAppend.checked = true;
         else if (els.recModeStandalone) els.recModeStandalone.checked = true;
+      }
+
+      if (uiSettings.presetsSection === 'custom' || uiSettings.presetsSection === 'built-in') {
+        setPresetTab(uiSettings.presetsSection, false);
+      }
+      if (uiSettings.presetSearch !== undefined) {
+        if (!S.ui) S.ui = {};
+        S.ui.presetSearch = uiSettings.presetSearch;
+        if (els.presetSearch) els.presetSearch.value = S.ui.presetSearch;
+      }
+      if (Array.isArray(uiSettings.recentPresetIds)) {
+        if (!S.ui) S.ui = {};
+        S.ui.recentPresetIds = uiSettings.recentPresetIds.slice(0, 8);
       }
 
       // Restore Audio Buffers & Recording History
@@ -3774,19 +3801,22 @@
         if (restoredBuf) {
           S.buffer = restoredBuf;
           S.originalBuffer = restoredOrig || cloneBuffer(restoredBuf);
-          S.previewBuf = null;
           S.peakPyramid = buildPeakPyramid(restoredBuf);
           S.waveZoom = uiSettings.waveZoom || 1;
           S.waveViewStart = uiSettings.waveViewStart || 0;
+          if (els.zoomChip) els.zoomChip.textContent = (Math.round(S.waveZoom * 10) / 10) + '×';
           S.playhead = 0;
           els.waveEmpty.classList.add('hidden');
           if (els.sourceMeta) {
             els.sourceMeta.textContent = S.sourceName + ' · mono · ' + fmtTime(restoredBuf.duration, false) + ' · ' + restoredBuf.sampleRate + ' Hz';
           }
+          // Immediately generate preview buffer with restored FX (pitch, reverse, crush, etc.) applied to raw audio
+          rebuildPreview();
         } else {
           S.buffer = null;
           S.originalBuffer = null;
           S.peakPyramid = null;
+          S.previewBuf = null;
           els.waveEmpty.classList.remove('hidden');
           if (els.sourceMeta) els.sourceMeta.textContent = '';
         }
@@ -3794,12 +3824,14 @@
         S.buffer = null;
         S.originalBuffer = null;
         S.peakPyramid = null;
+        S.previewBuf = null;
         takeCounter = 0;
         recordHistoryIndex = -1;
         els.waveEmpty.classList.remove('hidden');
         if (els.sourceMeta) els.sourceMeta.textContent = '';
       }
 
+      setDry(false, false);
       rebuildFxPanel();
       renderPresets();
       updateChainBar();
@@ -3807,6 +3839,7 @@
       updateRecordHistoryUI();
       updateTransportEnabled();
       updateTimeChip();
+      syncGainSlidersUI();
       resizeWave();
       drawWave();
       schedulePersist();
