@@ -1,0 +1,10 @@
+{
+  "name": "VoxClip Studio",
+  "description": "VoxClip Studio — browser voice changer. Record, transform, export. Fully on-device.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

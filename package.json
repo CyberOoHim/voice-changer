@@ -1,0 +1,19 @@
+{
+  "name": "voxclip-studio",
+  "version": "3.0.0",
+  "description": "Browser-native voice changer and sound design studio",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node -e \"console.log('Build successful')\"",
+    "lint": "node --check js/app.js && node --check js/fx-engine.js && node --check server.js",
+    "test": "node --test js/*.test.js"
+  },
+  "keywords": [
+    "voice-changer",
+    "web-audio",
+    "pwa",
+    "dsp"
+  ],
+  "license": "MIT"
+}
