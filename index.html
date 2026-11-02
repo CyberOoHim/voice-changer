@@ -127,6 +127,41 @@
     .pill.offline .dot { background: var(--warn); }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
 
+    /* Power Eco Mode (iPad / Battery optimizations) */
+    .pill.eco-pill {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--muted);
+      transition: border-color .15s, color .15s, background .15s;
+    }
+    .pill.eco-pill:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    .pill.eco-pill.active {
+      border-color: rgba(52, 211, 153, .45);
+      background: rgba(52, 211, 153, .12);
+      color: #6ee7b7;
+      font-weight: 600;
+    }
+    .pill.eco-pill.active .eco-dot {
+      background: var(--ok);
+    }
+    .pill.eco-pill:not(.active) .eco-dot {
+      background: var(--muted);
+    }
+    body.power-eco .card {
+      backdrop-filter: none !important;
+      -webkit-backdrop-filter: none !important;
+      background: #121821 !important;
+    }
+    body.power-eco .btn-rec.recording {
+      animation: none !important;
+      background: rgba(244, 63, 94, .35) !important;
+      box-shadow: 0 0 0 2px var(--danger) !important;
+    }
+
     .card {
       background: rgba(18, 24, 33, .88);
       border: 1px solid var(--border);
@@ -1059,6 +1094,250 @@
       font-size: .78rem;
       border-radius: 8px;
     }
+
+    /* Live Monitor & Feedback Guard */
+    .btn-monitor {
+      font-size: .84rem;
+      background: rgba(15, 23, 32, 0.7);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-monitor:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.12);
+    }
+    .btn-monitor.active {
+      border-color: #22d3ee;
+      background: rgba(34, 211, 238, 0.2);
+      color: #a5f3fc;
+      font-weight: 700;
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.35);
+    }
+
+    /* Pre-FX Vocal Cleanup */
+    .cleanup-details {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(15, 23, 32, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .cleanup-details > summary {
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--muted);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .cleanup-details > summary::-webkit-details-marker { display: none; }
+    .cleanup-details > summary::before { content: "▸"; color: var(--accent); }
+    .cleanup-details[open] > summary::before { content: "▾"; }
+    .cleanup-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    @media (min-width: 640px) {
+      .cleanup-grid { grid-template-columns: 1fr 1fr; }
+    }
+    .cleanup-col {
+      display: grid;
+      gap: 8px;
+    }
+
+    /* Visualizer Dock */
+    .vis-dock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .vis-tabs {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .vis-tabs button {
+      min-height: 32px;
+      min-width: 70px;
+      padding: 0.2rem 0.65rem;
+      font-size: .75rem;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      color: var(--muted);
+    }
+    .vis-tabs button.active {
+      background: var(--bg3);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Timeline Cue Markers */
+    .cue-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .cue-marker-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      flex: 1 1 200px;
+    }
+    .cue-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: .72rem;
+      cursor: pointer;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .cue-chip:hover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.22);
+    }
+    .cue-chip .del-cue {
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 800;
+      margin-left: 2px;
+    }
+    .cue-chip .del-cue:hover {
+      color: var(--danger);
+    }
+
+    /* 2D Macro XY Morph Pad */
+    .xy-pad-wrap {
+      position: relative;
+      background: #080d14;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 8px;
+      height: 180px;
+      touch-action: none;
+    }
+    #xyPadCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+    }
+    .xy-pad-labels {
+      position: absolute;
+      bottom: 8px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      pointer-events: none;
+      font-size: .75rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+    }
+    .xy-axis-label.x { color: var(--accent); font-weight: 600; }
+    .xy-axis-label.y { color: var(--accent2); font-weight: 600; }
+
+    /* Mastering & LUFS */
+    .mastering-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      background: rgba(15, 23, 32, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      flex-wrap: wrap;
+    }
+    .mastering-row label {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .mastering-row select {
+      flex: 1 1 200px;
+      min-height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      padding: 0 10px;
+      font-size: .84rem;
+    }
+    .lufs-readout {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: var(--ok);
+      font-size: .84rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(52, 211, 153, 0.12);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+    }
+
+    /* Batch export modal grid */
+    .batch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 6px;
+      max-height: 240px;
+      overflow-y: auto;
+      margin: 10px 0;
+      padding: 4px;
+    }
+    .batch-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .78rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .batch-item:hover {
+      border-color: var(--accent);
+    }
+    .batch-item input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
+    .batch-progress {
+      width: 100%;
+      height: 8px;
+      background: var(--bg);
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 10px 0 4px;
+      display: none;
+    }
+    .batch-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--ok));
+      transition: width .15s;
+    }
   </style>
 </head>
 <body>
@@ -1078,6 +1357,10 @@
           <span class="dot" aria-hidden="true"></span>
           <span id="netPillText">Online</span>
         </span>
+        <button type="button" id="btnEcoToggle" class="pill eco-pill" aria-label="Toggle Power Eco Mode" title="Eco Mode: 24 FPS render cap, smart DSP caching &amp; idle audio sleep (click to toggle)">
+          <span class="dot eco-dot" aria-hidden="true"></span>
+          <span id="ecoPillText">Eco: Auto</span>
+        </button>
         <button type="button" id="btnProject" class="btn-ghost" aria-label="Projects" title="Projects (Save &amp; Restore) · Ctrl+S / Ctrl+O">📁 Project</button>
         <button type="button" id="btnSettings" class="btn-ghost" aria-label="Settings">⚙</button>
       </div>
@@ -1088,6 +1371,7 @@
       <h2 id="srcTitle">Source</h2>
       <div class="source-actions">
         <button type="button" id="btnRecord" class="btn-primary btn-rec" aria-label="Record from microphone">● Record</button>
+        <button type="button" id="btnLiveMonitor" class="btn-monitor" aria-label="Toggle live microphone monitor" aria-pressed="false" title="Hear your transformed voice in real time">🎧 Monitor</button>
         <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
         <button type="button" id="btnUndoRecord" class="btn-rec-history" disabled aria-label="Undo recording take" title="Undo recording take (Alt+Z)">↶ Undo Rec</button>
         <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
@@ -1138,15 +1422,58 @@
           <button type="button" id="btnMatchLoudness" disabled aria-label="Match clip loudness">Match loudness</button>
         </div>
       </div>
+      <details id="cleanupDetails" class="cleanup-details">
+        <summary>Vocal Cleanup (Noise Gate, De-Esser, Hum Filter)</summary>
+        <div class="cleanup-grid">
+          <div class="cleanup-col">
+            <div class="gain-row">
+              <header>
+                <strong>Noise Gate</strong>
+                <span id="gateThresholdVal" class="val">Off</span>
+              </header>
+              <input type="range" id="gateThreshold" min="-100" max="-20" step="1" value="-100" aria-label="Noise gate threshold" />
+            </div>
+            <div class="row">
+              <button type="button" id="btnAutoCalibrateGate" class="btn-xs" aria-label="Auto-calibrate noise gate threshold from background room noise">Auto-Calibrate Gate</button>
+            </div>
+          </div>
+          <div class="cleanup-col">
+            <div class="gain-row">
+              <header>
+                <strong>De-Esser (Sibilance)</strong>
+                <span id="deEssAmountVal" class="val">0%</span>
+              </header>
+              <input type="range" id="deEssAmount" min="0" max="1" step="0.01" value="0" aria-label="De-esser reduction strength" />
+            </div>
+            <div class="gain-row" style="margin-top:2px;">
+              <header>
+                <strong>Hum Notch</strong>
+              </header>
+              <select id="humNotchSelect" aria-label="Mains hum notch filter" style="min-height:34px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 8px;font-size:.82rem;">
+                <option value="0" selected>Off (No hum filter)</option>
+                <option value="50">50 Hz Notch (+ 100Hz Harmonic)</option>
+                <option value="60">60 Hz Notch (+ 120Hz Harmonic)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
       <p id="sourceMeta" class="footer-note" style="text-align:left;margin-top:10px;margin-bottom:0"></p>
     </section>
 
-    <!-- WAVE / TRANSPORT -->
+    <!-- WAVE / TRANSPORT / VISUALIZER -->
     <section class="card" aria-labelledby="waveTitle">
-      <h2 id="waveTitle">Preview</h2>
+      <div class="vis-dock-header">
+        <h2 id="waveTitle" style="margin:0;">Visualizer &amp; Preview</h2>
+        <div class="vis-tabs" role="tablist" aria-label="Visualizer Display Mode">
+          <button type="button" id="visTabWave" class="active" role="tab" aria-selected="true">Waveform</button>
+          <button type="button" id="visTabSpectrum" role="tab" aria-selected="false">Spectrum</button>
+          <button type="button" id="visTabSpectrogram" role="tab" aria-selected="false">Spectrogram</button>
+        </div>
+      </div>
       <video id="videoPreview" muted playsinline webkit-playsinline preload="metadata"></video>
       <div class="wave-wrap" id="waveWrap">
-        <canvas id="wave" aria-label="Waveform — click or tap to seek"></canvas>
+        <canvas id="wave" aria-label="Visualizer display — click or tap to seek in waveform"></canvas>
         <div id="waveEmpty" class="wave-empty">Pick a voice character, then record or upload</div>
         <div id="bakeOverlay" class="busy-overlay" role="status"><span><span class="spinner"></span>Applying FX…</span></div>
       </div>
@@ -1156,6 +1483,11 @@
         <button type="button" id="btnZoomIn" disabled aria-label="Zoom in">+</button>
         <button type="button" id="btnZoomReset" disabled aria-label="Reset zoom">1×</button>
         <span id="zoomChip" class="zoom-chip">1×</span>
+      </div>
+      <div class="cue-toolbar" role="toolbar" aria-label="Timeline cue markers">
+        <button type="button" id="btnAddMarker" class="btn-xs" disabled aria-label="Add cue marker at playhead" title="Add cue marker at playhead (Hotkey: M)">+ Marker (M)</button>
+        <button type="button" id="btnClearMarkers" class="btn-xs" disabled aria-label="Clear all cue markers">Clear</button>
+        <div id="cueMarkerList" class="cue-marker-list"></div>
       </div>
       <div class="transport" role="toolbar" aria-label="Transport">
         <span class="skip-desktop">
@@ -1183,12 +1515,25 @@
       </div>
     </section>
 
-    <!-- EXPORT -->
+    <!-- EXPORT & MASTERING -->
     <section class="card" aria-labelledby="exportTitle">
-      <h2 id="exportTitle">Export &amp; Projects</h2>
+      <h2 id="exportTitle">Export &amp; Mastering</h2>
+      <div class="mastering-row">
+        <label for="lufsTargetSelect">Mastering Target</label>
+        <select id="lufsTargetSelect" aria-label="LUFS Loudness Target">
+          <option value="off">Off (Standard Limiter 0.89)</option>
+          <option value="-14" selected>-14 LUFS (Streaming · YouTube / Spotify / Reels)</option>
+          <option value="-16">-16 LUFS (Podcasts · Apple Podcasts / AES TD1004)</option>
+          <option value="-23">-23 LUFS (Broadcast · EBU R128)</option>
+        </select>
+        <span id="lufsMeterReadout" class="lufs-readout" title="Integrated Loudness (ITU-R BS.1770)">--.- LUFS</span>
+      </div>
       <div class="export-row">
-        <button type="button" id="btnExportPrimary" class="btn-primary" disabled aria-label="Export WAV">Export WAV</button>
+        <button type="button" id="btnExportPrimary" class="btn-primary" disabled aria-label="Export WAV 16-bit">Export WAV (16-bit)</button>
+        <button type="button" id="btnExportWav24" class="btn-secondary" disabled aria-label="Export Studio WAV 24-bit">Export WAV (24-bit)</button>
         <button type="button" id="btnExportSecondary" class="btn-secondary" disabled aria-label="Export MP3">Export MP3</button>
+        <button type="button" id="btnExportOpus" class="btn-secondary" disabled aria-label="Export OGG/Opus">Export Opus</button>
+        <button type="button" id="btnBatchExport" class="btn-primary" disabled aria-label="Batch Export across multiple presets" title="Batch render clip across multiple presets in one go">⚡ Batch Presets</button>
         <button type="button" id="btnSaveProject" class="btn-primary" aria-label="Save project" title="Save full project settings &amp; audio buffer (Ctrl+S)">💾 Save Project</button>
         <button type="button" id="btnRestoreProject" class="btn-secondary" aria-label="Restore project" title="Restore project from file or browser library (Ctrl+O)">📂 Restore Project</button>
         <button type="button" id="btnShare" hidden disabled aria-label="Share export">Share</button>
@@ -1220,6 +1565,26 @@
       <div id="presetGrid" class="preset-groups" role="list"></div>
       <div id="customEmpty" class="empty-customs" hidden>
         No saved settings yet. Tweak the FX Lab, then tap <strong>Save settings</strong>.
+      </div>
+    </section>
+
+    <!-- 2D MACRO XY MORPH PAD -->
+    <section class="card" aria-labelledby="xyPadTitle">
+      <div class="row spread" style="margin-bottom:6px;">
+        <h2 id="xyPadTitle" style="margin:0;">Macro XY Morph Pad</h2>
+        <select id="xyAxisMode" aria-label="XY Pad Axis Preset" style="min-height:34px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 8px;font-size:.82rem;">
+          <option value="pitch-formant" selected>Pitch (X) × Formant (Y)</option>
+          <option value="space-grit">Space Reverb (X) × Drive Grit (Y)</option>
+          <option value="robot-mod">Robot RingMod (X) × Chorus Mod (Y)</option>
+          <option value="vocal-polish">Noise Gate (X) × Input Gain (Y)</option>
+        </select>
+      </div>
+      <div class="xy-pad-wrap" id="xyPadWrap">
+        <canvas id="xyPadCanvas" width="400" height="180" aria-label="2D interactive Macro XY morph pad — drag to morph parameters"></canvas>
+        <div class="xy-pad-labels">
+          <span id="xyLabelX" class="xy-axis-label x">Pitch: 0.0st</span>
+          <span id="xyLabelY" class="xy-axis-label y">Formant: 0.0st</span>
+        </div>
       </div>
     </section>
 
@@ -1284,6 +1649,17 @@
             <option value="wav">WAV</option>
             <option value="mp3">MP3</option>
           </select>
+        </div>
+        <div class="field">
+          <label for="ecoModeSelect">Power Eco Mode (iPad / Battery)</label>
+          <select id="ecoModeSelect">
+            <option value="auto" selected>Auto (iPad &amp; Battery — 24 fps)</option>
+            <option value="on">Always On (24 fps Eco)</option>
+            <option value="off">Off (Full Performance 60 fps)</option>
+          </select>
+          <small class="hint" style="color:var(--muted);font-size:.72rem;display:block;margin-top:4px;">
+            Caps visualizers to 24 fps on iPad/battery, suspends idle AudioContext after 4s, and eliminates unnecessary DSP passes.
+          </small>
         </div>
         <div class="field">
           <label for="fxSourceMode">Built-in FX Presets Source</label>
@@ -1415,9 +1791,69 @@
           No saved projects in this browser yet.<br />Save a project on the <strong>Save Project</strong> tab or open a <strong>.voxproject</strong> file.
         </div>
       </div>
+      <div class="modal-actions" style="margin-top:12px">
+        <button type="button" id="projectModalClose" class="btn-primary">Done</button>
+      </div>
+    </div>
+  </div>
 
-      <div class="modal-actions" style="margin-top:14px;">
-        <button type="button" id="projectModalClose">Close</button>
+  <!-- Live Monitor Headphone Check Modal -->
+  <div id="liveMonitorModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="liveMonitorTitle" hidden>
+    <div class="modal">
+      <h3 id="liveMonitorTitle">🎧 Headphone Safety Check</h3>
+      <p>Live Monitoring plays your transformed microphone input through your speakers in real time.</p>
+      <div style="background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.3);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:.82rem;color:#fef08a;line-height:1.4;">
+        ⚠️ <strong>Prevent acoustic feedback:</strong> Please connect <strong>headphones or earbuds</strong> before proceeding. Playing into open speakers can trigger loud howling and screeching.
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:.82rem;color:var(--text);margin-bottom:12px;">
+        <input type="checkbox" id="chkSkipMonitorWarn" style="accent-color:var(--accent);" />
+        <span>Don't remind me again on this device</span>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="liveMonitorCancel">Cancel</button>
+        <button type="button" id="liveMonitorConfirm" class="btn-primary">Enable Live Monitor</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch Presets Export Modal -->
+  <div id="batchExportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="batchExportTitle" hidden>
+    <div class="modal" style="width:min(540px,100%);">
+      <h3 id="batchExportTitle">⚡ Batch Presets Export</h3>
+      <p style="margin-bottom:8px;">Render your current clip across multiple presets with target LUFS loudness mastering in one click.</p>
+      <div class="row spread" style="align-items:center;margin-bottom:6px;">
+        <span style="font-size:.8rem;color:var(--muted);font-weight:700;">Select Presets:</span>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="btnBatchSelectAll" class="btn-xs">Select All</button>
+          <button type="button" id="btnBatchDeselectAll" class="btn-xs">Deselect</button>
+        </div>
+      </div>
+      <div id="batchPresetGrid" class="batch-grid">
+        <!-- Filled dynamically -->
+      </div>
+      <div id="batchProgress" class="batch-progress">
+        <div id="batchProgressBar" class="batch-progress-bar"></div>
+      </div>
+      <p id="batchStatusText" style="font-size:.78rem;color:var(--muted);margin:4px 0 10px;" hidden></p>
+      <div class="modal-actions">
+        <button type="button" id="batchExportCancel">Close</button>
+        <button type="button" id="batchExportStart" class="btn-primary">Render Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generic Studio Dialog Modal (replaces browser confirm/prompt) -->
+  <div id="dialogModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" hidden>
+    <div class="modal">
+      <h3 id="dialogTitle">Dialog</h3>
+      <p id="dialogDesc" style="margin-bottom:12px;"></p>
+      <div id="dialogInputGroup" class="field" style="margin-bottom:12px;" hidden>
+        <label for="dialogInput" id="dialogInputLabel">Input</label>
+        <input type="text" id="dialogInput" maxlength="60" autocomplete="off" />
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="dialogCancel">Cancel</button>
+        <button type="button" id="dialogConfirm" class="btn-primary">OK</button>
       </div>
     </div>
   </div>

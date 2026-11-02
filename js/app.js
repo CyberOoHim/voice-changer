@@ -47,6 +47,8 @@
 
     let DEFAULT_FX_VALUES = {
       pitchSemi: 0,
+      pitchCents: 0,
+      pitchMode: 'hq',
       formant: 0,
       reverse: false,
       speed: 1,
@@ -79,16 +81,62 @@
       vibratoRate: 5,
       gain: 1,
       compressorThresh: -18,
-      compressorRatio: 3
+      compressorRatio: 3,
+      // Phase 1 Vocal Cleanup
+      gateThreshold: -100,
+      gateRelease: 0.05,
+      deEssAmount: 0,
+      deEssFreq: 6500,
+      humNotch: 0,
+      // Phase 2 Synthesis
+      harmonyPreset: 'none',
+      harmonyMix: 0,
+      vocoderMix: 0,
+      vocoderCarrier: 'saw',
+      vocoderBands: 16
     };
 
     const defaultFx = () => ({ ...DEFAULT_FX_VALUES });
 
     let FX_META = [
       { group: 'Pitch & Formant', params: [
+        { key: 'pitchMode', label: 'Pitch engine', type: 'select', options: [
+          { value: 'hq', label: 'Phase-Vocoder HQ (Artifact-Free)' },
+          { value: 'granular', label: 'Granular SOLA (Classic)' }
+        ]},
         { key: 'pitchSemi', label: 'Pitch', min: -12, max: 12, step: 0.1, unit: 'st' },
+        { key: 'pitchCents', label: 'Fine tune', min: -100, max: 100, step: 1, unit: '¢' },
         { key: 'formant', label: 'Formant', min: -12, max: 12, step: 0.1, unit: 'st' },
         { key: 'reverse', label: 'Reverse', type: 'bool' }
+      ]},
+      { group: 'Harmonizer & Vocoder', params: [
+        { key: 'harmonyPreset', label: 'Harmonizer chord', type: 'select', options: [
+          { value: 'none', label: 'None (Off)' },
+          { value: 'octave-down', label: 'Octave Down (-12st)' },
+          { value: 'octave-up', label: 'Octave Up (+12st)' },
+          { value: 'power-fifth', label: 'Power 5th (+7st)' },
+          { value: 'major-chord', label: 'Major Triad (+4st, +7st)' },
+          { value: 'minor-chord', label: 'Minor Triad (+3st, +7st)' },
+          { value: 'choir-wide', label: 'Choir Ensemble (±12st, ±7st)' }
+        ]},
+        { key: 'harmonyMix', label: 'Harmonizer mix', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'vocoderMix', label: '16-Band Vocoder mix', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'vocoderCarrier', label: 'Vocoder carrier', type: 'select', options: [
+          { value: 'saw', label: 'Sawtooth Buzz (80 Hz)' },
+          { value: 'pulse', label: 'Pulse Wave (110 Hz)' },
+          { value: 'chord', label: 'Synth Chord (Cm Triad)' },
+          { value: 'noise', label: 'Whisper Noise' }
+        ]},
+        { key: 'vocoderBands', label: 'Vocoder bands', type: 'select', options: [
+          { value: '8', label: '8 Bands (Vintage Lo-Fi)' },
+          { value: '16', label: '16 Bands (Studio Clean)' }
+        ]}
+      ]},
+      { group: 'Vocal Cleanup Strip', params: [
+        { key: 'gateThreshold', label: 'Noise gate thresh', min: -100, max: -20, step: 1, unit: 'dB' },
+        { key: 'gateRelease', label: 'Gate release', min: 0.02, max: 0.5, step: 0.01, unit: 's' },
+        { key: 'deEssAmount', label: 'De-Esser amount', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'deEssFreq', label: 'De-Esser freq', min: 4500, max: 9000, step: 100, unit: 'Hz' }
       ]},
       { group: 'Time & Speed', params: [
         { key: 'speed', label: 'Speed', min: 0.5, max: 2, step: 0.01, unit: '×' },
@@ -404,18 +452,34 @@
       recCountdownTimer: 0,
       previewTimer: 0,
       recMode: 'standalone',
+      liveMonitoring: false,
+      liveMonitorStream: null,
+      liveMonitorSource: null,
+      liveMonitorChain: null,
+      liveMonitorFeedbackRaf: 0,
+      skipMonitorWarn: false,
+      visMode: 'waveform',
+      xyAxisMode: 'pitch-formant',
+      lufsTarget: '-14',
+      cueMarkers: [],
+      ecoActive: false,
       ui: {
+        ecoMode: 'auto',
         fxSourceMode: 'local',
         fxRemoteUrl: '',
         maxRecordSec: 180,
         recMode: 'standalone',
         recentPresetIds: [],
-        presetSearch: ''
+        presetSearch: '',
+        visMode: 'waveform',
+        xyAxisMode: 'pitch-formant',
+        lufsTarget: '-14'
       }
     };
 
     let audioCtx = null;
     let masterGain = null;
+    let masterAnalyser = null;
     let playSource = null;
     let playChainCleanup = null;
     let playStartedAt = 0;
@@ -434,6 +498,7 @@
     let recordUsedLiveGain = false;
     let meterSmoothPeak = 0;
     let persistTimer = 0;
+    let xyDragging = false;
     /** FX history (not persisted — session only) */
     let undoStack = [];
     let redoStack = [];
@@ -453,6 +518,14 @@
     const $ = (id) => document.getElementById(id);
     const els = {
       btnRecord: $('btnRecord'),
+      btnLiveMonitor: $('btnLiveMonitor'),
+      cleanupDetails: $('cleanupDetails'),
+      gateThreshold: $('gateThreshold'),
+      gateThresholdVal: $('gateThresholdVal'),
+      btnAutoCalibrateGate: $('btnAutoCalibrateGate'),
+      deEssAmount: $('deEssAmount'),
+      deEssAmountVal: $('deEssAmountVal'),
+      humNotchSelect: $('humNotchSelect'),
       btnUpload: $('btnUpload'),
       btnUndoRecord: $('btnUndoRecord'),
       btnRedoRecord: $('btnRedoRecord'),
@@ -472,10 +545,16 @@
       inputGainVal: $('inputGainVal'),
       sourceMeta: $('sourceMeta'),
       videoPreview: $('videoPreview'),
+      visTabWave: $('visTabWave'),
+      visTabSpectrum: $('visTabSpectrum'),
+      visTabSpectrogram: $('visTabSpectrogram'),
       wave: $('wave'),
       waveEmpty: $('waveEmpty'),
       bakeOverlay: $('bakeOverlay'),
       timeChip: $('timeChip'),
+      btnAddMarker: $('btnAddMarker'),
+      btnClearMarkers: $('btnClearMarkers'),
+      cueMarkerList: $('cueMarkerList'),
       btnPlay: $('btnPlay'),
       btnStop: $('btnStop'),
       btnLoop: $('btnLoop'),
@@ -500,10 +579,19 @@
       chainLabel: $('chainLabel'),
       btnSaveSettings: $('btnSaveSettings'),
       btnClearChain: $('btnClearChain'),
+      xyAxisMode: $('xyAxisMode'),
+      xyPadCanvas: $('xyPadCanvas'),
+      xyLabelX: $('xyLabelX'),
+      xyLabelY: $('xyLabelY'),
       labDetails: $('labDetails'),
       fxPanel: $('fxPanel'),
+      lufsTargetSelect: $('lufsTargetSelect'),
+      lufsMeterReadout: $('lufsMeterReadout'),
       btnExportPrimary: $('btnExportPrimary'),
+      btnExportWav24: $('btnExportWav24'),
       btnExportSecondary: $('btnExportSecondary'),
+      btnExportOpus: $('btnExportOpus'),
+      btnBatchExport: $('btnBatchExport'),
       btnShare: $('btnShare'),
       btnResetProject: $('btnResetProject'),
       btnAB: $('btnAB'),
@@ -524,6 +612,17 @@
       packApplyAllKeep: $('packApplyAllKeep'),
       netPill: $('netPill'),
       netPillText: $('netPillText'),
+      btnEcoToggle: $('btnEcoToggle'),
+      ecoPillText: $('ecoPillText'),
+      ecoModeSelect: $('ecoModeSelect'),
+      dialogModal: $('dialogModal'),
+      dialogTitle: $('dialogTitle'),
+      dialogDesc: $('dialogDesc'),
+      dialogInputGroup: $('dialogInputGroup'),
+      dialogInput: $('dialogInput'),
+      dialogInputLabel: $('dialogInputLabel'),
+      dialogCancel: $('dialogCancel'),
+      dialogConfirm: $('dialogConfirm'),
       btnSettings: $('btnSettings'),
       toasts: $('toasts'),
       saveModal: $('saveModal'),
@@ -575,7 +674,20 @@
       projectFileInput: $('projectFileInput'),
       savedProjectsList: $('savedProjectsList'),
       savedProjectsEmpty: $('savedProjectsEmpty'),
-      projectModalClose: $('projectModalClose')
+      projectModalClose: $('projectModalClose'),
+      liveMonitorModal: $('liveMonitorModal'),
+      liveMonitorCancel: $('liveMonitorCancel'),
+      liveMonitorConfirm: $('liveMonitorConfirm'),
+      chkSkipMonitorWarn: $('chkSkipMonitorWarn'),
+      batchExportModal: $('batchExportModal'),
+      batchPresetGrid: $('batchPresetGrid'),
+      batchProgress: $('batchProgress'),
+      batchProgressBar: $('batchProgressBar'),
+      batchStatusText: $('batchStatusText'),
+      btnBatchSelectAll: $('btnBatchSelectAll'),
+      btnBatchDeselectAll: $('btnBatchDeselectAll'),
+      batchExportCancel: $('batchExportCancel'),
+      batchExportStart: $('batchExportStart')
     };
 
     /* =========================================================
@@ -637,6 +749,7 @@
       const d = defaultFx();
       if (!(key in d)) return v;
       if (typeof d[key] === 'boolean') return !!v;
+      if (typeof d[key] === 'string') return String(v);
       const n = Number(v);
       if (!isFinite(n)) return d[key];
       const meta = fxParamMeta(key);
@@ -676,12 +789,110 @@
         audioCtx = new AC();
         masterGain = audioCtx.createGain();
         masterGain.gain.value = 1;
-        masterGain.connect(audioCtx.destination);
+        masterAnalyser = audioCtx.createAnalyser();
+        masterAnalyser.fftSize = 256;
+        masterAnalyser.smoothingTimeConstant = 0.8;
+        masterGain.connect(masterAnalyser);
+        masterAnalyser.connect(audioCtx.destination);
       }
       if (audioCtx.state === 'suspended') {
         audioCtx.resume().catch(() => {});
       }
       return audioCtx;
+    }
+
+    let audioIdleTimer = 0;
+    function markAudioActive() {
+      clearTimeout(audioIdleTimer);
+      audioIdleTimer = 0;
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    }
+
+    function checkIdleAudio() {
+      clearTimeout(audioIdleTimer);
+      if (S.playing || S.recording || S.liveMonitoring || S.baking) return;
+      audioIdleTimer = setTimeout(() => {
+        if (!S.playing && !S.recording && !S.liveMonitoring && !S.baking && audioCtx && audioCtx.state === 'running') {
+          audioCtx.suspend().catch(() => {});
+        }
+      }, 4000);
+    }
+
+    /* =========================================================
+       iPad & Mobile Power Eco Engine
+       ========================================================= */
+    function isIPadOrIOS() {
+      if (typeof navigator === 'undefined') return false;
+      const ua = navigator.userAgent || '';
+      const isIOS = /iPad|iPhone|iPod/.test(ua);
+      const isIPadOS = (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      return isIOS || isIPadOS;
+    }
+
+    let batteryDischarging = false;
+    let batteryLevel = 1;
+    function initBatteryMonitor() {
+      if (typeof navigator !== 'undefined' && typeof navigator.getBattery === 'function') {
+        navigator.getBattery().then((b) => {
+          const update = () => {
+            batteryDischarging = !b.charging;
+            batteryLevel = b.level;
+            applyEcoModeState();
+          };
+          update();
+          b.addEventListener('chargingchange', update);
+          b.addEventListener('levelchange', update);
+        }).catch(() => {});
+      }
+    }
+
+    function isEcoActive() {
+      const mode = (S.ui && S.ui.ecoMode) || 'auto';
+      if (mode === 'on') return true;
+      if (mode === 'off') return false;
+      // Auto: active if iPad/iOS device or on discharging battery
+      if (isIPadOrIOS()) return true;
+      if (batteryDischarging && batteryLevel <= 0.4) return true;
+      return false;
+    }
+
+    function getMinFrameIntervalMs() {
+      // 24 FPS (~41.67ms) in Eco Mode on iPad / mobile / battery, uncapped otherwise
+      return S.ecoActive ? (1000 / 24) : 0;
+    }
+
+    function applyEcoModeState() {
+      const active = isEcoActive();
+      S.ecoActive = active;
+      document.documentElement.classList.toggle('power-eco', active);
+      if (els.ecoPillText) {
+        const mode = (S.ui && S.ui.ecoMode) || 'auto';
+        if (active) {
+          els.ecoPillText.textContent = mode === 'on' ? 'Eco: 24 FPS' : 'Eco: 24 FPS (Auto)';
+        } else {
+          els.ecoPillText.textContent = mode === 'off' ? 'Eco: Off' : 'Eco: 60 FPS';
+        }
+      }
+      if (els.btnEcoToggle) {
+        els.btnEcoToggle.classList.toggle('active', active);
+        els.btnEcoToggle.setAttribute('aria-pressed', String(active));
+      }
+      if (els.ecoModeSelect && S.ui && S.ui.ecoMode) {
+        els.ecoModeSelect.value = S.ui.ecoMode;
+      }
+    }
+
+    function toggleEcoModeSetting() {
+      const cur = (S.ui && S.ui.ecoMode) || 'auto';
+      const next = cur === 'auto' ? 'on' : (cur === 'on' ? 'off' : 'auto');
+      S.ui = S.ui || {};
+      S.ui.ecoMode = next;
+      applyEcoModeState();
+      schedulePersist();
+      const label = next === 'auto' ? 'Auto (iPad & Battery)' : (next === 'on' ? 'Always On (24 FPS Eco)' : 'Off (Full Performance)');
+      toast('Power Eco: ' + label, 'ok');
     }
 
     const fxApi = (window.VoxFx && window.VoxFx.createFxEngine)
@@ -703,11 +914,21 @@
     const peakOf = fxApi.peakOf;
     const applyPeakLimiter = fxApi.applyPeakLimiter;
     const reverseBuffer = fxApi.reverseBuffer;
+    const applyNoiseGate = fxApi.applyNoiseGate;
+    const applyHumNotch = fxApi.applyHumNotch;
+    const applyDeEsser = fxApi.applyDeEsser;
     const applyFadesAndCrush = fxApi.applyFadesAndCrush;
     const pitchShiftKeepLength = fxApi.pitchShiftKeepLength;
+    const pitchShiftPhaseVocoder = fxApi.pitchShiftPhaseVocoder;
+    const applyHarmonizer = fxApi.applyHarmonizer;
+    const applyVocoder = fxApi.applyVocoder;
+    const computeLUFS = fxApi.computeLUFS;
+    const normalizeToLUFS = fxApi.normalizeToLUFS;
     const buildPeakPyramid = fxApi.buildPeakPyramid;
     const buildFxChain = fxApi.buildFxChain;
     const bufferToWav = fxApi.bufferToWav;
+    const bufferToWav24 = fxApi.bufferToWav24;
+    const bufferToOpus = fxApi.bufferToOpus;
     const bufferToBase64Wav = fxApi.bufferToBase64Wav;
     const base64ToArrayBuffer = fxApi.base64ToArrayBuffer;
 
@@ -731,6 +952,7 @@
           presetsSection: 'built-in',
           micLevel: defaultMicLevel(),
           inputGain: defaultInputGain(),
+          ecoMode: 'auto',
           fxSourceMode: 'local',
           fxRemoteUrl: '',
           maxRecordSec: 180,
@@ -792,6 +1014,7 @@
         ui.presetSearch = typeof ui.presetSearch === 'string' ? ui.presetSearch.slice(0, 40) : '';
         ui.micLevel = clampNum(ui.micLevel, 1, 12, defaultMicLevel());
         ui.inputGain = clampNum(ui.inputGain, 0.5, 9, defaultInputGain());
+        ui.ecoMode = ['auto', 'on', 'off'].includes(ui.ecoMode) ? ui.ecoMode : 'auto';
         ui.presetCatOpen = sanitizeCatOpen(ui.presetCatOpen);
         const customs = Array.isArray(data.customSettings)
           ? data.customSettings.slice(0, MAX_CUSTOMS).map((c) => ({
@@ -844,6 +1067,7 @@
           presetsSection: S.presetsSection || 'built-in',
           micLevel: S.micLevel,
           inputGain: S.inputGain,
+          ecoMode: (S.ui && S.ui.ecoMode) || 'auto',
           fxSourceMode: (S.ui && S.ui.fxSourceMode) || 'local',
           fxRemoteUrl: (S.ui && S.ui.fxRemoteUrl) || '',
           maxRecordSec: (S.ui && S.ui.maxRecordSec) || 180,
@@ -899,6 +1123,7 @@
       S.micLevel = clampNum(p.ui.micLevel, 1, 12, defaultMicLevel());
       S.inputGain = clampNum(p.ui.inputGain, 0.5, 9, defaultInputGain());
       S.ui = S.ui || {};
+      S.ui.ecoMode = ['auto', 'on', 'off'].includes(p.ui.ecoMode) ? p.ui.ecoMode : 'auto';
       S.ui.fxSourceMode = p.ui.fxSourceMode === 'github' ? 'github' : 'local';
       S.ui.fxRemoteUrl = typeof p.ui.fxRemoteUrl === 'string' ? p.ui.fxRemoteUrl : '';
       S.ui.maxRecordSec = [60, 180, 300, 600].includes(Number(p.ui.maxRecordSec)) ? Number(p.ui.maxRecordSec) : 180;
@@ -919,6 +1144,8 @@
       if (els.fxSourceMode) els.fxSourceMode.value = S.ui.fxSourceMode;
       if (els.fxRemoteUrl) els.fxRemoteUrl.value = S.ui.fxRemoteUrl;
       if (els.fxRemoteUrlGroup) els.fxRemoteUrlGroup.hidden = (S.ui.fxSourceMode !== 'github');
+      if (els.ecoModeSelect) els.ecoModeSelect.value = S.ui.ecoMode;
+      applyEcoModeState();
       if (els.recModeStandalone && els.recModeAppend) {
         if (S.recMode === 'append') els.recModeAppend.checked = true;
         else els.recModeStandalone.checked = true;
@@ -1623,6 +1850,21 @@
     /* =========================================================
        Buffer helpers (incl. iPad / quiet-mic normalize)
        ========================================================= */
+    const OFFLINE_DSP_KEYS = [
+      'pitchSemi', 'pitchCents', 'pitchMode', 'reverse',
+      'harmonyPreset', 'harmonyMix', 'vocoderMix', 'vocoderCarrier', 'vocoderBands',
+      'gateThreshold', 'gateRelease', 'deEssAmount', 'deEssFreq', 'humNotch',
+      'fadeIn', 'fadeOut', 'bitcrush', 'sampleRateCrush', 'speed'
+    ];
+
+    function getOfflineDspFingerprint(fx) {
+      if (!fx) return '';
+      return OFFLINE_DSP_KEYS.map((k) => k + ':' + fx[k]).join('|');
+    }
+
+    let lastBakedFingerprint = '';
+    let activePlayChain = null;
+
     function invalidatePreview() {
       S.previewBuf = null;
       clearTimeout(S.previewTimer);
@@ -1632,15 +1874,41 @@
     function rebuildPreview() {
       if (!S.buffer) {
         S.previewBuf = null;
+        lastBakedFingerprint = '';
+        updateLufsReadout(null);
         return;
       }
+      lastBakedFingerprint = getOfflineDspFingerprint(S.fx);
       let b = S.buffer;
+      // Pre-cleanup strip
+      if ((S.fx.humNotch || 0) > 0) b = applyHumNotch(b, S.fx.humNotch);
+      if ((S.fx.gateThreshold || -100) > -95) {
+        b = applyNoiseGate(b, { thresholdDb: S.fx.gateThreshold, releaseSec: S.fx.gateRelease });
+      }
+      if ((S.fx.deEssAmount || 0) > 0.01) {
+        b = applyDeEsser(b, { amount: S.fx.deEssAmount, freq: S.fx.deEssFreq || 6500 });
+      }
+
       if (S.fx.reverse) b = reverseBuffer(b);
-      if (Math.abs(S.fx.pitchSemi || 0) > 1e-4) b = pitchShiftKeepLength(b, S.fx.pitchSemi);
+
+      const semi = S.fx.pitchSemi || 0;
+      const cents = S.fx.pitchCents || 0;
+      if (Math.abs(semi) > 1e-4 || Math.abs(cents) > 1e-4) {
+        b = pitchShiftKeepLength(b, semi, { mode: S.fx.pitchMode || 'hq', cents });
+      }
+
+      if ((S.fx.harmonyMix || 0) > 0.01 && S.fx.harmonyPreset && S.fx.harmonyPreset !== 'none') {
+        b = applyHarmonizer(b, S.fx);
+      }
+      if ((S.fx.vocoderMix || 0) > 0.01) {
+        b = applyVocoder(b, S.fx);
+      }
+
       if ((S.fx.fadeIn || 0) > 0.001 || (S.fx.fadeOut || 0) > 0.001 || (S.fx.bitcrush || 0) > 0.001 || (S.fx.sampleRateCrush || 0) > 0.001) {
         b = applyFadesAndCrush(b, S.fx);
       }
       S.previewBuf = b;
+      updateLufsReadout(b);
       if (S.playing && !S.comparingDry) startPlayback();
     }
 
@@ -1668,7 +1936,11 @@
       S.inputGain = g;
       syncGainSlidersUI();
       schedulePersist();
-      if (S.playing) startPlayback();
+      if (activePlayChain && activePlayChain.updateLiveParams && !S.comparingDry) {
+        activePlayChain.updateLiveParams(S.fx, { inputGain: S.inputGain });
+      } else if (S.playing) {
+        startPlayback();
+      }
       toast('Input gain set to ' + formatGainX(g) + ' for matched loudness', 'ok');
     }
 
@@ -1685,6 +1957,7 @@
         try { playChainCleanup(); } catch (_) {}
         playChainCleanup = null;
       }
+      activePlayChain = null;
       if (S.playing) {
         const ctx = audioCtx;
         if (ctx) {
@@ -1701,6 +1974,7 @@
       try {
         els.videoPreview.pause();
       } catch (_) {}
+      checkIdleAudio();
     }
 
     function updatePlayButton() {
@@ -1735,6 +2009,7 @@
 
     function startPlayback() {
       if (!S.buffer || S.baking) return;
+      markAudioActive();
       const ctx = ensureAudioCtx();
       stopPlayback(false);
 
@@ -1744,8 +2019,9 @@
         /* dry is unprocessed working buffer */
       }
 
-      const chain = buildFxChain(ctx, dry ? defaultFx() : S.fx, { inputGain: dry ? 1 : undefined });
+      const chain = buildFxChain(ctx, dry ? defaultFx() : S.fx, { inputGain: dry ? 1 : S.inputGain });
       chain.output.connect(masterGain);
+      activePlayChain = dry ? null : chain;
 
       const src = ctx.createBufferSource();
       src.buffer = buf;
@@ -1762,12 +2038,14 @@
         depth.connect(src.playbackRate);
         try { lfo.start(0); } catch (_) {}
         playChainCleanup = () => {
+          activePlayChain = null;
           try { lfo.stop(); } catch (_) {}
           chain.stopExtras();
           try { chain.output.disconnect(); } catch (_) {}
         };
       } else {
         playChainCleanup = () => {
+          activePlayChain = null;
           chain.stopExtras();
           try { chain.output.disconnect(); } catch (_) {}
         };
@@ -1791,11 +2069,13 @@
           S.playhead = S.buffer ? S.buffer.duration : 0;
           playSource = null;
           if (playChainCleanup) { playChainCleanup(); playChainCleanup = null; }
+          activePlayChain = null;
           updatePlayButton();
           updateTimeChip();
           drawWave();
           syncVideo();
           try { els.videoPreview.pause(); } catch (_) {}
+          checkIdleAudio();
         }
       };
 
@@ -1815,8 +2095,15 @@
         } catch (_) {}
       }
 
-      const tick = () => {
+      let lastPlayAnimTime = 0;
+      const tick = (now) => {
         if (!S.playing) return;
+        const minInterval = getMinFrameIntervalMs();
+        if (minInterval > 0 && now && lastPlayAnimTime && (now - lastPlayAnimTime < minInterval)) {
+          animRaf = requestAnimationFrame(tick);
+          return;
+        }
+        lastPlayAnimTime = now || performance.now();
         const t = playOffset + (ctx.currentTime - playStartedAt) * rate;
         S.playhead = Math.min(buf.duration, Math.max(0, t));
         updateTimeChip();
@@ -1892,7 +2179,8 @@
     function resizeWave() {
       const canvas = els.wave;
       const rect = canvas.parentElement.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const maxDpr = S.ecoActive ? 1.5 : 2;
+      const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       canvas.width = Math.max(1, Math.floor(rect.width * dpr));
       canvas.height = Math.max(1, Math.floor(rect.height * dpr));
       canvas.style.width = rect.width + 'px';
@@ -1919,6 +2207,98 @@
       drawWave();
     }
 
+    let spectrogramCanvas = null;
+    let spectrogramCtx = null;
+
+    function setVisMode(mode) {
+      S.visMode = mode;
+      S.ui = S.ui || {};
+      S.ui.visMode = mode;
+      if (els.visTabWave) els.visTabWave.classList.toggle('active', mode === 'waveform');
+      if (els.visTabSpectrum) els.visTabSpectrum.classList.toggle('active', mode === 'spectrum');
+      if (els.visTabSpectrogram) els.visTabSpectrogram.classList.toggle('active', mode === 'spectrogram');
+      schedulePersist();
+      drawWave();
+    }
+
+    function addCueMarker(time) {
+      if (!S.buffer) return;
+      const t = typeof time === 'number' ? time : S.playhead;
+      const clamped = Math.max(0, Math.min(S.buffer.duration, t));
+      const marker = {
+        id: uid(),
+        time: Math.round(clamped * 100) / 100,
+        label: 'Cue ' + (S.cueMarkers.length + 1)
+      };
+      S.cueMarkers.push(marker);
+      S.cueMarkers.sort((a, b) => a.time - b.time);
+      renderCueMarkers();
+      drawWave();
+      toast('Cue marker #' + (S.cueMarkers.indexOf(marker) + 1) + ' added at ' + fmtTime(marker.time), 'ok');
+    }
+
+    function clearCueMarkers() {
+      if (!S.cueMarkers.length) return;
+      S.cueMarkers = [];
+      renderCueMarkers();
+      drawWave();
+      toast('Cue markers cleared');
+    }
+
+    function deleteCueMarker(id) {
+      S.cueMarkers = S.cueMarkers.filter((m) => m.id !== id);
+      renderCueMarkers();
+      drawWave();
+    }
+
+    function seekToCueMarker(index) {
+      if (!S.buffer || !S.cueMarkers[index]) return;
+      const m = S.cueMarkers[index];
+      const wasPlaying = S.playing;
+      S.playhead = m.time;
+      if (wasPlaying) startPlayback();
+      else {
+        updateTimeChip();
+        drawWave();
+        syncVideo();
+      }
+      toast('Jumped to Cue #' + (index + 1) + ' (' + fmtTime(m.time) + ')');
+    }
+
+    function renderCueMarkers() {
+      if (!els.cueMarkerList) return;
+      els.cueMarkerList.replaceChildren();
+      if (!S.cueMarkers.length) {
+        const span = document.createElement('span');
+        span.className = 'cue-empty-hint';
+        span.textContent = 'No cue markers yet (Press “M” during playback to drop markers)';
+        els.cueMarkerList.appendChild(span);
+        return;
+      }
+      S.cueMarkers.forEach((m, idx) => {
+        const chip = document.createElement('div');
+        chip.className = 'cue-chip';
+        const num = document.createElement('span');
+        num.className = 'cue-chip-num';
+        num.textContent = '#' + (idx + 1);
+        const time = document.createElement('span');
+        time.className = 'cue-chip-time';
+        time.textContent = fmtTime(m.time);
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'cue-chip-del';
+        del.textContent = '×';
+        del.title = 'Remove cue marker';
+        del.addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteCueMarker(m.id);
+        });
+        chip.append(num, time, del);
+        chip.addEventListener('click', () => seekToCueMarker(idx));
+        els.cueMarkerList.appendChild(chip);
+      });
+    }
+
     function drawWave() {
       const canvas = els.wave;
       const ctx = canvas.getContext('2d');
@@ -1930,45 +2310,164 @@
 
       if (!S.buffer) return;
       const view = viewWindow();
-      const pyr = S.peakPyramid;
-      const mid = h / 2;
-      ctx.strokeStyle = '#38bdf8';
-      ctx.globalAlpha = 0.9;
-      ctx.lineWidth = Math.max(1, canvas.width / 900);
-      ctx.beginPath();
-      if (pyr && pyr.cols) {
-        const i0 = Math.floor(view.start * pyr.cols);
-        const i1 = Math.max(i0 + 1, Math.ceil(view.end * pyr.cols));
-        const span = i1 - i0;
-        for (let x = 0; x < w; x++) {
-          const pi = Math.min(pyr.cols - 1, i0 + Math.floor((x / w) * span));
-          const y1 = mid + pyr.mins[pi] * mid * 0.92;
-          const y2 = mid + pyr.maxs[pi] * mid * 0.92;
-          ctx.moveTo(x, y1);
-          ctx.lineTo(x, y2);
-        }
-      } else {
-        const data = S.buffer.getChannelData(0);
-        const n = data.length;
-        const start = Math.floor(view.start * n);
-        const end = Math.ceil(view.end * n);
-        const step = Math.max(1, Math.floor((end - start) / w));
-        for (let x = 0; x < w; x++) {
-          const s0 = start + x * step;
-          let mn = 1, mx = -1;
-          for (let i = 0; i < step && s0 + i < n; i++) {
-            const v = data[s0 + i] || 0;
-            if (v < mn) mn = v;
-            if (v > mx) mx = v;
+      const dur = S.buffer.duration || 1;
+
+      if (S.visMode === 'spectrum') {
+        // 64-band FFT Spectrum Visualizer
+        const activeAnalyser = (S.playing && masterAnalyser) ? masterAnalyser : (S.liveMonitoring || S.recording) ? (recordAnalyser || masterAnalyser) : null;
+        const binCount = 64;
+        const freqData = new Uint8Array(binCount);
+        if (activeAnalyser) {
+          activeAnalyser.getByteFrequencyData(freqData);
+        } else {
+          // Static spectral preview from buffer playhead
+          const ch = S.buffer.getChannelData(0);
+          const samplePos = Math.floor((S.playhead / dur) * ch.length);
+          for (let b = 0; b < binCount; b++) {
+            let sum = 0;
+            const stride = Math.max(1, Math.floor(64 / (b + 1)));
+            for (let s = 0; s < 32; s++) {
+              const idx = (samplePos + s * stride) % ch.length;
+              sum += Math.abs(ch[idx] || 0);
+            }
+            freqData[b] = Math.min(255, Math.floor((sum / 32) * 400));
           }
-          ctx.moveTo(x, mid + mn * mid * 0.92);
-          ctx.lineTo(x, mid + mx * mid * 0.92);
+        }
+
+        const barWidth = w / binCount;
+        for (let i = 0; i < binCount; i++) {
+          const val = freqData[i] / 255;
+          const barH = val * h * 0.92;
+          const x = i * barWidth;
+          const y = h - barH;
+
+          const grad = ctx.createLinearGradient(0, y, 0, h);
+          grad.addColorStop(0, '#38bdf8');
+          grad.addColorStop(0.5, '#f59e0b');
+          grad.addColorStop(1, '#ec4899');
+          ctx.fillStyle = grad;
+          ctx.fillRect(x + 1, y, Math.max(1, barWidth - 2), barH);
+        }
+      } else if (S.visMode === 'spectrogram') {
+        // Waterfall Spectrogram Visualizer
+        if (!spectrogramCanvas || spectrogramCanvas.width !== 300 || spectrogramCanvas.height !== 128) {
+          spectrogramCanvas = document.createElement('canvas');
+          spectrogramCanvas.width = 300;
+          spectrogramCanvas.height = 128;
+          spectrogramCtx = spectrogramCanvas.getContext('2d');
+          spectrogramCtx.fillStyle = '#06090e';
+          spectrogramCtx.fillRect(0, 0, 300, 128);
+        }
+
+        const activeAnalyser = (S.playing && masterAnalyser) ? masterAnalyser : (S.liveMonitoring || S.recording) ? (recordAnalyser || masterAnalyser) : null;
+        const bins = 128;
+        const freqData = new Uint8Array(bins);
+        if (activeAnalyser) {
+          activeAnalyser.getByteFrequencyData(freqData);
+        } else {
+          const ch = S.buffer.getChannelData(0);
+          const pos = Math.floor((S.playhead / dur) * ch.length);
+          for (let b = 0; b < bins; b++) {
+            const v = Math.abs(ch[(pos + b * 2) % ch.length] || 0);
+            freqData[b] = Math.min(255, Math.floor(v * 300));
+          }
+        }
+
+        // Shift left by 2px
+        spectrogramCtx.drawImage(spectrogramCanvas, -2, 0);
+
+        // Draw new slice on right edge
+        for (let y = 0; y < bins; y++) {
+          const v = freqData[bins - 1 - y] / 255; // High freq at top
+          let r = 0, g = 0, b = 0;
+          if (v < 0.25) {
+            r = Math.floor(v * 4 * 30);
+            g = Math.floor(v * 4 * 100);
+            b = Math.floor(v * 4 * 240);
+          } else if (v < 0.6) {
+            const t = (v - 0.25) / 0.35;
+            r = Math.floor(30 + t * 210);
+            g = Math.floor(100 + t * 50);
+            b = Math.floor(240 * (1 - t));
+          } else {
+            const t = (v - 0.6) / 0.4;
+            r = 240 + Math.floor(t * 15);
+            g = Math.floor(150 + t * 105);
+            b = Math.floor(t * 220);
+          }
+          spectrogramCtx.fillStyle = `rgb(${r},${g},${b})`;
+          spectrogramCtx.fillRect(298, y, 2, 1);
+        }
+
+        ctx.drawImage(spectrogramCanvas, 0, 0, w, h);
+      } else {
+        // Mode 'waveform'
+        const pyr = S.peakPyramid;
+        const mid = h / 2;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = Math.max(1, canvas.width / 900);
+        ctx.beginPath();
+        if (pyr && pyr.cols) {
+          const i0 = Math.floor(view.start * pyr.cols);
+          const i1 = Math.max(i0 + 1, Math.ceil(view.end * pyr.cols));
+          const span = i1 - i0;
+          for (let x = 0; x < w; x++) {
+            const pi = Math.min(pyr.cols - 1, i0 + Math.floor((x / w) * span));
+            const y1 = mid + pyr.mins[pi] * mid * 0.92;
+            const y2 = mid + pyr.maxs[pi] * mid * 0.92;
+            ctx.moveTo(x, y1);
+            ctx.lineTo(x, y2);
+          }
+        } else {
+          const data = S.buffer.getChannelData(0);
+          const n = data.length;
+          const start = Math.floor(view.start * n);
+          const end = Math.ceil(view.end * n);
+          const step = Math.max(1, Math.floor((end - start) / w));
+          for (let x = 0; x < w; x++) {
+            const s0 = start + x * step;
+            let mn = 1, mx = -1;
+            for (let i = 0; i < step && s0 + i < n; i++) {
+              const v = data[s0 + i] || 0;
+              if (v < mn) mn = v;
+              if (v > mx) mx = v;
+            }
+            ctx.moveTo(x, mid + mn * mid * 0.92);
+            ctx.lineTo(x, mid + mx * mid * 0.92);
+          }
+        }
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      // Draw Cue Markers
+      if (S.cueMarkers && S.cueMarkers.length && S.buffer) {
+        for (let mIdx = 0; mIdx < S.cueMarkers.length; mIdx++) {
+          const marker = S.cueMarkers[mIdx];
+          const mNorm = marker.time / dur;
+          if (mNorm >= view.start && mNorm <= view.end) {
+            const mx = ((mNorm - view.start) / view.span) * w;
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath();
+            ctx.moveTo(mx, 0);
+            ctx.lineTo(mx, h);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            // Tag
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(mx - 10, 2, 20, 14);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 9px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(String(mIdx + 1), mx, 12);
+          }
         }
       }
-      ctx.stroke();
-      ctx.globalAlpha = 1;
 
-      const dur = S.buffer.duration || 1;
+      // Draw Playhead
       const norm = (S.playhead / dur);
       if (norm >= view.start && norm <= view.end) {
         const px = ((norm - view.start) / view.span) * w;
@@ -1997,13 +2496,438 @@
       }
     }
 
+    let timeChipB = null;
+    let timeChipText = null;
     function updateTimeChip() {
       const cur = S.playhead || 0;
       const dur = S.buffer ? S.buffer.duration : 0;
-      els.timeChip.replaceChildren();
-      const b = document.createElement('b');
-      b.textContent = fmtTime(cur);
-      els.timeChip.append(b, document.createTextNode(' / ' + fmtTime(dur)));
+      if (!timeChipB || !timeChipText || els.timeChip.childElementCount !== 1) {
+        els.timeChip.replaceChildren();
+        timeChipB = document.createElement('b');
+        timeChipText = document.createTextNode('');
+        els.timeChip.append(timeChipB, timeChipText);
+      }
+      timeChipB.textContent = fmtTime(cur);
+      timeChipText.data = ' / ' + fmtTime(dur);
+    }
+
+    /* =========================================================
+       2D Macro XY Morph Pad
+       ========================================================= */
+    const XY_MODES = {
+      'pitch-formant': {
+        nameX: 'Pitch (-12 to +12 st)',
+        nameY: 'Formant (-12 to +12 st)',
+        paramX: 'pitchSemi',
+        paramY: 'formant',
+        minX: -12, maxX: 12,
+        minY: -12, maxY: 12
+      },
+      'space-grit': {
+        nameX: 'Distortion (0 to 0.8)',
+        nameY: 'Reverb Mix (0 to 0.8)',
+        paramX: 'distortion',
+        paramY: 'reverbMix',
+        minX: 0, maxX: 0.8,
+        minY: 0, maxY: 0.8
+      },
+      'robot-mod': {
+        nameX: 'Ring Mod (0 to 60 Hz)',
+        nameY: 'Bitcrush (0 to 0.8)',
+        paramX: 'ringFreq',
+        paramY: 'bitcrush',
+        minX: 0, maxX: 60,
+        minY: 0, maxY: 0.8
+      },
+      'vocal-polish': {
+        nameX: 'De-Esser (0 to 0.8)',
+        nameY: 'Comp Ratio (1 to 12)',
+        paramX: 'deEssAmount',
+        paramY: 'compressorRatio',
+        minX: 0, maxX: 0.8,
+        minY: 1, maxY: 12
+      }
+    };
+
+    function updateXyLabels() {
+      const mode = XY_MODES[S.xyAxisMode] || XY_MODES['pitch-formant'];
+      if (els.xyLabelX) els.xyLabelX.textContent = '↔ ' + mode.nameX;
+      if (els.xyLabelY) els.xyLabelY.textContent = '↕ ' + mode.nameY;
+    }
+
+    function drawXyPad() {
+      const canvas = els.xyPadCanvas;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.fillStyle = '#070b10';
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const x = (w / 4) * i;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        const y = (h / 4) * i;
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#334155';
+      ctx.beginPath();
+      ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+      ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+      ctx.stroke();
+
+      const mode = XY_MODES[S.xyAxisMode] || XY_MODES['pitch-formant'];
+      const valX = S.fx[mode.paramX] != null ? S.fx[mode.paramX] : 0;
+      const valY = S.fx[mode.paramY] != null ? S.fx[mode.paramY] : 0;
+      const normX = Math.max(0, Math.min(1, (valX - mode.minX) / (mode.maxX - mode.minX)));
+      const normY = Math.max(0, Math.min(1, (valY - mode.minY) / (mode.maxY - mode.minY)));
+
+      const px = normX * w;
+      const py = (1 - normY) * h;
+
+      const grad = ctx.createRadialGradient(px, py, 2, px, py, 16);
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+      grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
+      grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(px, py, 16, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    function handleXyPointer(e) {
+      const canvas = els.xyPadCanvas;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const normX = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const normY = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+
+      const mode = XY_MODES[S.xyAxisMode] || XY_MODES['pitch-formant'];
+      const targetValX = mode.minX + normX * (mode.maxX - mode.minX);
+      const targetValY = mode.minY + normY * (mode.maxY - mode.minY);
+
+      S.fx[mode.paramX] = Math.round(targetValX * 100) / 100;
+      S.fx[mode.paramY] = Math.round(targetValY * 100) / 100;
+
+      const elX = document.getElementById('fx_' + mode.paramX);
+      const valElX = document.querySelector('[data-val="' + mode.paramX + '"]');
+      if (elX) elX.value = String(S.fx[mode.paramX]);
+      if (valElX) valElX.textContent = formatFxVal(mode.paramX, S.fx[mode.paramX]);
+
+      const elY = document.getElementById('fx_' + mode.paramY);
+      const valElY = document.querySelector('[data-val="' + mode.paramY + '"]');
+      if (elY) elY.value = String(S.fx[mode.paramY]);
+      if (valElY) valElY.textContent = formatFxVal(mode.paramY, S.fx[mode.paramY]);
+
+      drawXyPad();
+      onFxEdited(false);
+    }
+
+    /* =========================================================
+       Live Monitoring & Feedback Guard
+       ========================================================= */
+    async function startLiveMonitor() {
+      if (S.liveMonitoring) return;
+      if (S.recording) {
+        toast('Cannot monitor while recording.');
+        return;
+      }
+      try {
+        ensureAudioCtx();
+        await audioCtx.resume();
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
+        });
+        S.liveMonitorStream = stream;
+
+        const srcNode = audioCtx.createMediaStreamSource(stream);
+        S.liveMonitorSource = srcNode;
+
+        const monitorAnalyser = audioCtx.createAnalyser();
+        monitorAnalyser.fftSize = 256;
+        const monitorGain = audioCtx.createGain();
+        monitorGain.gain.value = 1;
+
+        const chain = buildFxChain(audioCtx, S.fx, { live: true });
+        S.liveMonitorChain = chain;
+
+        srcNode.connect(chain.input);
+        chain.output.connect(monitorGain);
+        monitorGain.connect(monitorAnalyser);
+        monitorAnalyser.connect(masterGain);
+
+        S.liveMonitoring = true;
+        if (els.btnLiveMonitor) {
+          els.btnLiveMonitor.classList.add('active', 'recording');
+          els.btnLiveMonitor.textContent = '🔴 Monitor Active';
+          els.btnLiveMonitor.title = 'Live mic monitoring is active (Click to mute)';
+        }
+
+        markAudioActive();
+        const timeDomain = new Float32Array(monitorAnalyser.fftSize);
+        let highPeakCount = 0;
+        let lastFeedbackTime = 0;
+        const checkFeedback = (now) => {
+          if (!S.liveMonitoring) return;
+          const minInterval = getMinFrameIntervalMs();
+          if (minInterval > 0 && now && lastFeedbackTime && (now - lastFeedbackTime < minInterval)) {
+            S.liveMonitorFeedbackRaf = requestAnimationFrame(checkFeedback);
+            return;
+          }
+          lastFeedbackTime = now || performance.now();
+          monitorAnalyser.getFloatTimeDomainData(timeDomain);
+          let peak = 0;
+          for (let i = 0; i < timeDomain.length; i++) {
+            const a = Math.abs(timeDomain[i]);
+            if (a > peak) peak = a;
+          }
+          if (peak > 0.96) {
+            highPeakCount++;
+            if (highPeakCount > 18) {
+              stopLiveMonitor();
+              toast('Acoustic feedback loop detected! Live monitor was muted to protect your ears.', 'error');
+              return;
+            }
+          } else {
+            highPeakCount = Math.max(0, highPeakCount - 1);
+          }
+          S.liveMonitorFeedbackRaf = requestAnimationFrame(checkFeedback);
+        };
+        S.liveMonitorFeedbackRaf = requestAnimationFrame(checkFeedback);
+        toast('Live monitor active (headphones recommended)', 'ok');
+      } catch (err) {
+        console.error(err);
+        stopLiveMonitor();
+        toast('Could not access microphone for live monitoring.', 'error');
+      }
+    }
+
+    function stopLiveMonitor() {
+      if (S.liveMonitorFeedbackRaf) {
+        cancelAnimationFrame(S.liveMonitorFeedbackRaf);
+        S.liveMonitorFeedbackRaf = 0;
+      }
+      if (S.liveMonitorSource) {
+        try { S.liveMonitorSource.disconnect(); } catch (_) {}
+        S.liveMonitorSource = null;
+      }
+      if (S.liveMonitorChain) {
+        try { S.liveMonitorChain.stopExtras(); S.liveMonitorChain.output.disconnect(); } catch (_) {}
+        S.liveMonitorChain = null;
+      }
+      if (S.liveMonitorStream) {
+        try {
+          S.liveMonitorStream.getTracks().forEach((t) => t.stop());
+        } catch (_) {}
+        S.liveMonitorStream = null;
+      }
+      S.liveMonitoring = false;
+      if (els.btnLiveMonitor) {
+        els.btnLiveMonitor.classList.remove('active', 'recording');
+        els.btnLiveMonitor.textContent = '🎧 Live Monitor';
+        els.btnLiveMonitor.title = 'Hear your voice with FX in real-time through headphones';
+      }
+      checkIdleAudio();
+    }
+
+    function toggleLiveMonitor() {
+      if (S.liveMonitoring) {
+        stopLiveMonitor();
+        toast('Live monitor disabled');
+        return;
+      }
+      if (!S.skipMonitorWarn) {
+        showModal(els.liveMonitorModal);
+      } else {
+        startLiveMonitor();
+      }
+    }
+
+    async function autoCalibrateGate() {
+      if (S.recording || S.baking) return;
+      toast('Sampling background noise floor for 1 second... please stay quiet', 'ok');
+      try {
+        ensureAudioCtx();
+        await audioCtx.resume();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+        });
+        const src = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+
+        const data = new Float32Array(analyser.fftSize);
+        let sumSquared = 0;
+        let count = 0;
+        const start = Date.now();
+
+        await new Promise((resolve) => {
+          const sample = () => {
+            analyser.getFloatTimeDomainData(data);
+            for (let i = 0; i < data.length; i++) {
+              sumSquared += data[i] * data[i];
+              count++;
+            }
+            if (Date.now() - start < 800) {
+              requestAnimationFrame(sample);
+            } else {
+              resolve();
+            }
+          };
+          sample();
+        });
+
+        src.disconnect();
+        stream.getTracks().forEach((t) => t.stop());
+
+        const rms = Math.sqrt(sumSquared / Math.max(1, count));
+        const noiseDb = rms > 1e-6 ? 20 * Math.log10(rms) : -95;
+        const targetGate = Math.max(-95, Math.min(-20, Math.round(noiseDb + 5)));
+
+        pushHistory();
+        S.fx.gateThreshold = targetGate;
+        if (els.gateThreshold) {
+          els.gateThreshold.value = String(targetGate);
+          els.gateThresholdVal.textContent = targetGate + ' dB';
+        }
+        const labGate = document.getElementById('fx_gateThreshold');
+        const labValGate = document.querySelector('[data-val="gateThreshold"]');
+        if (labGate) labGate.value = String(targetGate);
+        if (labValGate) labValGate.textContent = targetGate + ' dB';
+
+        schedulePersist();
+        invalidatePreview();
+        toast('Noise gate calibrated to ' + targetGate + ' dB (Floor: ' + noiseDb.toFixed(1) + ' dB)', 'ok');
+      } catch (e) {
+        toast('Microphone access needed to calibrate noise gate.', 'error');
+      }
+    }
+
+    /* =========================================================
+       LUFS Metering & Batch Preset Renderer
+       ========================================================= */
+    function updateLufsReadout(buf) {
+      if (!els.lufsMeterReadout) return;
+      if (!buf || buf.duration < 0.1) {
+        els.lufsMeterReadout.textContent = '— LUFS · Peak: — dBFS';
+        return;
+      }
+      try {
+        const stats = computeLUFS(buf);
+        const lufsStr = isFinite(stats.lufs) ? stats.lufs.toFixed(1) + ' LUFS' : '— LUFS';
+        const peakStr = isFinite(stats.truePeakDb) ? stats.truePeakDb.toFixed(1) + ' dBFS' : '— dBFS';
+        els.lufsMeterReadout.textContent = lufsStr + ' · True Peak: ' + peakStr;
+      } catch (_) {
+        els.lufsMeterReadout.textContent = '— LUFS · Peak: — dBFS';
+      }
+    }
+
+    function openBatchExportModal() {
+      if (!S.buffer || S.baking) {
+        toast('Record or upload audio first');
+        return;
+      }
+      if (!els.batchPresetGrid) return;
+      els.batchPresetGrid.replaceChildren();
+      if (els.batchProgress) els.batchProgress.hidden = true;
+      if (els.batchStatusText) els.batchStatusText.textContent = '';
+      if (els.batchExportStart) els.batchExportStart.disabled = false;
+
+      BUILTIN_PRESETS.forEach((p) => {
+        const item = document.createElement('label');
+        item.className = 'batch-preset-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = p.id;
+        cb.checked = true;
+        const name = document.createElement('span');
+        name.textContent = p.emoji + ' ' + p.name;
+        item.append(cb, name);
+        els.batchPresetGrid.appendChild(item);
+      });
+      showModal(els.batchExportModal);
+    }
+
+    function setAllBatchCheckboxes(checked) {
+      if (!els.batchPresetGrid) return;
+      els.batchPresetGrid.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+        cb.checked = checked;
+      });
+    }
+
+    async function runBatchExport() {
+      if (!S.buffer || S.baking) return;
+      const checkedBoxes = Array.from(els.batchPresetGrid.querySelectorAll('input[type="checkbox"]:checked'));
+      if (!checkedBoxes.length) {
+        toast('Select at least one preset to batch export.');
+        return;
+      }
+      const selectedIds = checkedBoxes.map((cb) => cb.value);
+      if (els.batchProgress) els.batchProgress.hidden = false;
+      if (els.batchExportStart) els.batchExportStart.disabled = true;
+
+      const total = selectedIds.length;
+      let completed = 0;
+      S.baking = true;
+      updateTransportEnabled();
+
+      for (let i = 0; i < total; i++) {
+        const pId = selectedIds[i];
+        const preset = getPresetById(pId);
+        const name = preset ? preset.name : pId;
+        if (els.batchStatusText) {
+          els.batchStatusText.textContent = 'Rendering ' + (i + 1) + '/' + total + ': ' + name + '…';
+        }
+        if (els.batchProgressBar) {
+          els.batchProgressBar.style.width = Math.round((i / total) * 100) + '%';
+        }
+
+        try {
+          const fxObj = mergeFx(preset ? preset.fx : defaultFx());
+          let rendered = await renderWithFx(S.buffer, fxObj);
+          if (S.lufsTarget && S.lufsTarget !== 'off') {
+            rendered = normalizeToLUFS(rendered, Number(S.lufsTarget));
+          }
+          const blob = bufferToWav(rendered);
+          const safeName = (preset ? preset.name : pId).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          const fileName = 'voxclip-' + safeName + '-' + Date.now() + '.wav';
+          downloadBlob(blob, fileName);
+          completed++;
+          await new Promise((r) => setTimeout(r, 200));
+        } catch (err) {
+          console.error('Batch render error for ' + pId, err);
+        }
+      }
+
+      if (els.batchProgressBar) els.batchProgressBar.style.width = '100%';
+      if (els.batchStatusText) els.batchStatusText.textContent = 'Completed ' + completed + ' exports!';
+      setTimeout(() => {
+        hideModal(els.batchExportModal);
+        S.baking = false;
+        updateTransportEnabled();
+        toast('Batch export complete (' + completed + ' files rendered)', 'ok');
+      }, 700);
     }
 
     /* =========================================================
@@ -2091,9 +3015,15 @@
     function updateTransportEnabled() {
       const has = !!S.buffer && !S.baking;
       const hasBuf = !!S.buffer;
-      [els.btnPlay, els.btnStop, els.btnLoop, els.btnSkipN10, els.btnSkipN5, els.btnSkipP5, els.btnSkipP10, els.btnMoreSkip, els.btnFramePrev, els.btnFrameNext, els.btnExportPrimary, els.btnExportSecondary, els.btnResetAudio, els.btnAB, els.btnMatchLoudness, els.btnZoomIn, els.btnZoomOut, els.btnZoomReset].forEach((b) => {
+      [
+        els.btnPlay, els.btnStop, els.btnLoop, els.btnSkipN10, els.btnSkipN5, els.btnSkipP5, els.btnSkipP10,
+        els.btnMoreSkip, els.btnFramePrev, els.btnFrameNext, els.btnExportPrimary, els.btnExportSecondary,
+        els.btnExportWav24, els.btnExportOpus, els.btnBatchExport, els.btnAddMarker,
+        els.btnResetAudio, els.btnAB, els.btnMatchLoudness, els.btnZoomIn, els.btnZoomOut, els.btnZoomReset
+      ].forEach((b) => {
         if (b) b.disabled = !has;
       });
+      if (els.btnClearMarkers) els.btnClearMarkers.disabled = !has || !S.cueMarkers.length;
       els.btnLoop.disabled = !hasBuf || S.baking;
       els.btnApplyFx.disabled = !has || !isFxWet();
       els.btnRecord.disabled = S.baking || S.loading || !S.recordSupport;
@@ -2172,6 +3102,7 @@
 
     async function startRecording() {
       if (S.recording || S.baking || S.loading || !S.recordSupport) return;
+      markAudioActive();
       try {
         ensureAudioCtx();
         // Important for iOS/iPad: resume AudioContext inside user gesture
@@ -2296,8 +3227,15 @@
       meterTick();
     }
 
-    function meterTick() {
+    let lastMeterTime = 0;
+    function meterTick(now) {
       if (!S.recording) return;
+      const minInterval = getMinFrameIntervalMs();
+      if (minInterval > 0 && now && lastMeterTime && (now - lastMeterTime < minInterval)) {
+        recordMeterRaf = requestAnimationFrame(meterTick);
+        return;
+      }
+      lastMeterTime = now || performance.now();
       // Keep live mic gain in sync if user moves slider mid-record
       if (recordGainNode) {
         recordGainNode.gain.value = Math.max(1, S.micLevel || 1);
@@ -2426,6 +3364,8 @@
       } catch (e) {
         console.error(e);
         toast("Couldn't process recording. Try again.", 'error');
+      } finally {
+        checkIdleAudio();
       }
     }
 
@@ -2499,7 +3439,7 @@
           const parsed = JSON.parse(text);
           if (parsed && (parsed.kind === 'voxclip.studio.project.v1' || parsed.kind === 'voxclip.project' || (parsed.settings && parsed.audio) || (parsed.metadata && parsed.settings))) {
             if (S.buffer || (recordHistory && recordHistory.length > 0)) {
-              const ok = confirm('Restore project “' + (parsed.name || (parsed.metadata && parsed.metadata.name) || 'Project') + '”? Current audio and settings will be replaced.');
+              const ok = await studioConfirm('Restore project “' + (parsed.name || (parsed.metadata && parsed.metadata.name) || 'Project') + '”? Current audio and settings will be replaced.', { title: 'Restore Project', confirmText: 'Restore' });
               if (!ok) {
                 toast('Project restore cancelled');
                 return;
@@ -2545,7 +3485,7 @@
         mono = normalizeRecordingBuffer(mono);
         // Replace confirm after successful decode (PRD §19.5)
         if (S.buffer) {
-          const ok = confirm('Replace current audio with this file? Your current clip will be discarded.');
+          const ok = await studioConfirm('Replace current audio with this file? Your current clip will be discarded.', { title: 'Replace Audio', confirmText: 'Replace', danger: true });
           if (!ok) {
             toast('Upload cancelled');
             return;
@@ -2575,8 +3515,30 @@
     async function renderWithFx(sourceBuf, fx) {
       ensureAudioCtx();
       let buf = sourceBuf;
+      // Pre-cleanup strip
+      if ((fx.humNotch || 0) > 0) buf = applyHumNotch(buf, fx.humNotch);
+      if ((fx.gateThreshold || -100) > -95) {
+        buf = applyNoiseGate(buf, { thresholdDb: fx.gateThreshold, releaseSec: fx.gateRelease });
+      }
+      if ((fx.deEssAmount || 0) > 0.01) {
+        buf = applyDeEsser(buf, { amount: fx.deEssAmount, freq: fx.deEssFreq || 6500 });
+      }
+
       if (fx.reverse) buf = reverseBuffer(buf);
-      if (Math.abs(fx.pitchSemi || 0) > 1e-4) buf = pitchShiftKeepLength(buf, fx.pitchSemi);
+
+      const semi = fx.pitchSemi || 0;
+      const cents = fx.pitchCents || 0;
+      if (Math.abs(semi) > 1e-4 || Math.abs(cents) > 1e-4) {
+        buf = pitchShiftKeepLength(buf, semi, { mode: fx.pitchMode || 'hq', cents });
+      }
+
+      if ((fx.harmonyMix || 0) > 0.01 && fx.harmonyPreset && fx.harmonyPreset !== 'none') {
+        buf = applyHarmonizer(buf, fx);
+      }
+      if ((fx.vocoderMix || 0) > 0.01) {
+        buf = applyVocoder(buf, fx);
+      }
+
       if ((fx.fadeIn || 0) > 0.001 || (fx.fadeOut || 0) > 0.001 || (fx.bitcrush || 0) > 0.001 || (fx.sampleRateCrush || 0) > 0.001) {
         buf = applyFadesAndCrush(buf, fx);
       }
@@ -2728,8 +3690,37 @@
         if (isFxWet()) {
           buf = await renderWithFx(S.buffer, S.fx);
         }
+        if (S.lufsTarget && S.lufsTarget !== 'off') {
+          buf = normalizeToLUFS(buf, Number(S.lufsTarget));
+          updateLufsReadout(buf);
+        }
         const ts = Date.now();
-        if (format === 'wav') {
+        if (format === 'wav24') {
+          const blob = bufferToWav24(buf);
+          const name = 'voxclip-studio24-' + ts + '.wav';
+          downloadBlob(blob, name);
+          rememberExport(blob, name);
+          toast('Exported 24-bit Studio WAV: ' + name, 'ok');
+        } else if (format === 'opus') {
+          let blob = null;
+          let ext = 'opus';
+          if (typeof bufferToOpus === 'function') {
+            try {
+              const res = await bufferToOpus(buf);
+              if (res && res.blob) {
+                blob = res.blob;
+                ext = res.extension || 'opus';
+              }
+            } catch (err) {
+              console.warn('Opus encoding fallback:', err);
+            }
+          }
+          if (!blob) blob = bufferToWav(buf);
+          const name = 'voxclip-' + ts + '.' + ext;
+          downloadBlob(blob, name);
+          rememberExport(blob, name);
+          toast('Exported ' + name, 'ok');
+        } else if (format === 'wav') {
           const blob = bufferToWav(buf);
           const name = 'voxclip-' + ts + '.wav';
           downloadBlob(blob, name);
@@ -3076,10 +4067,10 @@
       toast('Saved “' + name + '”', 'ok');
     }
 
-    function renameCustom(id) {
+    async function renameCustom(id) {
       const c = S.customSettings.find((x) => x.id === id);
       if (!c) return;
-      const name = prompt('Rename setting', c.name);
+      const name = await studioPrompt('Enter new name for setting:', c.name, { title: 'Rename Custom Voice', label: 'Preset Name', confirmText: 'Rename' });
       if (name == null) return;
       const n = name.trim();
       if (!n || n.length > 40) {
@@ -3096,10 +4087,11 @@
       schedulePersist();
     }
 
-    function overwriteCustom(id) {
+    async function overwriteCustom(id) {
       const c = S.customSettings.find((x) => x.id === id);
       if (!c) return;
-      if (!confirm('Overwrite “' + c.name + '” with current FX?')) return;
+      const ok = await studioConfirm('Overwrite “' + c.name + '” with current FX?', { title: 'Overwrite Voice Setting', confirmText: 'Overwrite' });
+      if (!ok) return;
       c.fx = { ...S.fx };
       c.presetChain = sanitizePresetChain(S.presetChain);
       c.presetChainMix = sanitizeChainMix(S.presetChainMix, c.presetChain.length);
@@ -3112,10 +4104,11 @@
       toast('Updated “' + c.name + '”', 'ok');
     }
 
-    function deleteCustom(id) {
+    async function deleteCustom(id) {
       const c = S.customSettings.find((x) => x.id === id);
       if (!c) return;
-      if (!confirm('Delete “' + c.name + '”? This can’t be undone.')) return;
+      const ok = await studioConfirm('Delete “' + c.name + '”? This can’t be undone.', { title: 'Delete Custom Voice', confirmText: 'Delete', danger: true });
+      if (!ok) return;
       S.customSettings = S.customSettings.filter((x) => x.id !== id);
       if (S.activeCustomId === id) S.activeCustomId = null;
       renderPresets();
@@ -3138,6 +4131,7 @@
     function rebuildFxPanel() {
       const root = els.fxPanel;
       root.replaceChildren();
+      syncVocalCleanupUI();
       for (const group of FX_META) {
         const sec = document.createElement('div');
         sec.className = 'fx-group';
@@ -3164,6 +4158,31 @@
               S.fx[p.key] = e.target.checked;
               onFxEdited();
             });
+            sec.appendChild(row);
+          } else if (p.type === 'select') {
+            const row = document.createElement('div');
+            row.className = 'fx-row select-row';
+            const id = 'fx_' + p.key;
+            const label = document.createElement('label');
+            label.setAttribute('for', id);
+            const labName = document.createElement('span');
+            labName.textContent = p.label;
+            label.appendChild(labName);
+            const sel = document.createElement('select');
+            sel.id = id;
+            for (const opt of p.options) {
+              const o = document.createElement('option');
+              o.value = opt.value;
+              o.textContent = opt.label;
+              if (String(S.fx[p.key]) === String(opt.value)) o.selected = true;
+              sel.appendChild(o);
+            }
+            sel.addEventListener('change', () => {
+              pushHistory();
+              S.fx[p.key] = p.key === 'vocoderBands' ? parseInt(sel.value, 10) : sel.value;
+              onFxEdited(true);
+            });
+            row.append(label, sel);
             sec.appendChild(row);
           } else {
             const row = document.createElement('div');
@@ -3217,7 +4236,11 @@
                 }
                 schedulePersist();
                 updateTransportEnabled();
-                if (S.playing) startPlayback();
+                if (activePlayChain && activePlayChain.updateLiveParams && !S.comparingDry) {
+                  activePlayChain.updateLiveParams(S.fx, { inputGain: S.inputGain });
+                } else if (S.playing) {
+                  startPlayback();
+                }
               } else {
                 S.fx[p.key] = clampFxValue(p.key, v);
                 valEl.textContent = formatFxVal(p.key, S.fx[p.key], p.unit);
@@ -3229,7 +4252,11 @@
             input.addEventListener('change', () => {
               if (isExternal) {
                 schedulePersist();
-                if (S.playing) startPlayback();
+                if (activePlayChain && activePlayChain.updateLiveParams && !S.comparingDry) {
+                  activePlayChain.updateLiveParams(S.fx, { inputGain: S.inputGain });
+                } else if (S.playing) {
+                  startPlayback();
+                }
               } else onFxEdited(true);
             });
             sec.appendChild(row);
@@ -3257,6 +4284,20 @@
       return true;
     }
 
+    function syncVocalCleanupUI() {
+      if (els.gateThreshold) {
+        els.gateThreshold.value = String(S.fx.gateThreshold != null ? S.fx.gateThreshold : -100);
+        if (els.gateThresholdVal) els.gateThresholdVal.textContent = (S.fx.gateThreshold != null ? S.fx.gateThreshold : -100) + ' dB';
+      }
+      if (els.deEssAmount) {
+        els.deEssAmount.value = String(S.fx.deEssAmount != null ? S.fx.deEssAmount : 0);
+        if (els.deEssAmountVal) els.deEssAmountVal.textContent = Math.round((S.fx.deEssAmount || 0) * 100) + '%';
+      }
+      if (els.humNotchSelect) {
+        els.humNotchSelect.value = String(S.fx.humNotch || 0);
+      }
+    }
+
     function onFxEdited(restart = true, opts = {}) {
       if (opts.pushHistory) pushHistory();
       // Manual slider drift: keep chain badges until values no longer match chain recipe
@@ -3282,12 +4323,21 @@
           }
         }
       }
+      syncVocalCleanupUI();
       renderPresets();
       updateChainBar();
       updateTransportEnabled();
       schedulePersist();
-      invalidatePreview();
-      if (restart && S.playing) startPlayback();
+
+      const currentFp = getOfflineDspFingerprint(S.fx);
+      const offlineUnchanged = (currentFp === lastBakedFingerprint && S.previewBuf != null);
+
+      if (offlineUnchanged && S.playing && activePlayChain && activePlayChain.updateLiveParams && !S.comparingDry) {
+        activePlayChain.updateLiveParams(S.fx, { inputGain: S.inputGain });
+      } else {
+        invalidatePreview();
+        if (restart && S.playing) startPlayback();
+      }
     }
 
     /**
@@ -3415,8 +4465,9 @@
       toast('Project reset');
     }
 
-    function clearAllSaved() {
-      if (!confirm('Clear all saved settings, preferences, and custom voices on this device?')) return;
+    async function clearAllSaved() {
+      const ok = await studioConfirm('Clear all saved settings, preferences, and custom voices on this device?', { title: 'Clear All Saved Data', confirmText: 'Clear All', danger: true });
+      if (!ok) return;
       try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
       setDry(false, false);
       S.customSettings = [];
@@ -3605,6 +4656,7 @@
           activePresetId: S.presetChain.length ? S.presetChain[S.presetChain.length - 1] : null,
           activeCustomId: S.activeCustomId,
           customSettings: Array.isArray(S.customSettings) ? JSON.parse(JSON.stringify(S.customSettings)) : [],
+          cueMarkers: Array.isArray(S.cueMarkers) ? JSON.parse(JSON.stringify(S.cueMarkers)) : [],
           ui: {
             loop: !!S.loop,
             skipIntervalSec: S.skipIntervalSec,
@@ -3726,6 +4778,10 @@
         if (!S.ui) S.ui = {};
         S.ui.recentPresetIds = uiSettings.recentPresetIds.slice(0, 8);
       }
+
+      // Restore Cue Markers
+      S.cueMarkers = Array.isArray(settings.cueMarkers) ? settings.cueMarkers : [];
+      renderCueMarkers();
 
       // Restore Audio Buffers & Recording History
       ensureAudioCtx();
@@ -3941,7 +4997,8 @@
           btnDel.className = 'btn-danger btn-xs';
           btnDel.textContent = '🗑 Delete';
           btnDel.onclick = async () => {
-            if (!confirm('Delete project “' + p.name + '” from this browser?')) return;
+            const ok = await studioConfirm('Delete project “' + p.name + '” from this browser?', { title: 'Delete Project', confirmText: 'Delete', danger: true });
+            if (!ok) return;
             await deleteProjectFromDb(p.id);
             toast('Deleted ' + p.name, 'ok');
             renderSavedProjectsList();
@@ -4039,6 +5096,92 @@
       }
     }
 
+    function studioConfirm(desc, { title = 'Confirm', confirmText = 'Confirm', cancelText = 'Cancel', danger = false } = {}) {
+      return new Promise((resolve) => {
+        if (!els.dialogModal || !els.dialogConfirm || !els.dialogCancel) {
+          resolve(window.confirm(desc));
+          return;
+        }
+        if (els.dialogTitle) els.dialogTitle.textContent = title;
+        if (els.dialogDesc) els.dialogDesc.textContent = desc;
+        if (els.dialogInputGroup) els.dialogInputGroup.hidden = true;
+        els.dialogConfirm.textContent = confirmText;
+        els.dialogCancel.textContent = cancelText;
+        els.dialogConfirm.className = danger ? 'btn-danger' : 'btn-primary';
+
+        const onConfirm = () => { cleanup(); resolve(true); };
+        const onCancel = () => { cleanup(); resolve(false); };
+        const onDialogKey = (e) => {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            onCancel();
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            onConfirm();
+          }
+        };
+        const cleanup = () => {
+          els.dialogConfirm.removeEventListener('click', onConfirm);
+          els.dialogCancel.removeEventListener('click', onCancel);
+          window.removeEventListener('keydown', onDialogKey, true);
+          hideModal(els.dialogModal);
+        };
+
+        els.dialogConfirm.addEventListener('click', onConfirm);
+        els.dialogCancel.addEventListener('click', onCancel);
+        window.addEventListener('keydown', onDialogKey, true);
+        showModal(els.dialogModal);
+      });
+    }
+
+    function studioPrompt(desc, defaultValue = '', { title = 'Enter Value', label = 'Value', confirmText = 'Save', cancelText = 'Cancel' } = {}) {
+      return new Promise((resolve) => {
+        if (!els.dialogModal || !els.dialogConfirm || !els.dialogCancel || !els.dialogInput) {
+          resolve(window.prompt(desc, defaultValue));
+          return;
+        }
+        if (els.dialogTitle) els.dialogTitle.textContent = title;
+        if (els.dialogDesc) els.dialogDesc.textContent = desc;
+        if (els.dialogInputGroup) els.dialogInputGroup.hidden = false;
+        if (els.dialogInputLabel) els.dialogInputLabel.textContent = label;
+        els.dialogInput.value = defaultValue || '';
+        els.dialogConfirm.textContent = confirmText;
+        els.dialogCancel.textContent = cancelText;
+        els.dialogConfirm.className = 'btn-primary';
+
+        const onConfirm = () => {
+          const val = els.dialogInput.value;
+          cleanup();
+          resolve(val);
+        };
+        const onCancel = () => { cleanup(); resolve(null); };
+        const onInputKey = (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onConfirm();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onCancel();
+          }
+        };
+        const cleanup = () => {
+          els.dialogConfirm.removeEventListener('click', onConfirm);
+          els.dialogCancel.removeEventListener('click', onCancel);
+          els.dialogInput.removeEventListener('keydown', onInputKey);
+          hideModal(els.dialogModal);
+        };
+
+        els.dialogConfirm.addEventListener('click', onConfirm);
+        els.dialogCancel.addEventListener('click', onCancel);
+        els.dialogInput.addEventListener('keydown', onInputKey);
+        showModal(els.dialogModal);
+        setTimeout(() => {
+          els.dialogInput.focus();
+          els.dialogInput.select();
+        }, 50);
+      });
+    }
+
     /* =========================================================
        Long-press skip
        ========================================================= */
@@ -4070,7 +5213,7 @@
        Keyboard
        ========================================================= */
     function onKey(e) {
-      const modalOpen = [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal, els.projectModal]
+      const modalOpen = [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal, els.projectModal, els.liveMonitorModal, els.batchExportModal, els.dialogModal]
         .filter(Boolean)
         .find((m) => m.classList.contains('show'));
       if (modalOpen) {
@@ -4117,6 +5260,19 @@
         e.preventDefault();
         redoRecording();
         return;
+      }
+      if (k === 'm' || k === 'M') {
+        e.preventDefault();
+        addCueMarker();
+        return;
+      }
+      if (/^[1-9]$/.test(k)) {
+        const markerIdx = parseInt(k, 10) - 1;
+        if (S.cueMarkers && S.cueMarkers[markerIdx]) {
+          e.preventDefault();
+          seekToCueMarker(markerIdx);
+          return;
+        }
       }
       if (k === ' ' || k === 'Spacebar') {
         if (activatable) return;
@@ -4368,6 +5524,107 @@
 
       els.btnExportPrimary.addEventListener('click', () => exportAudio(els.btnExportPrimary.dataset.format || 'wav'));
       els.btnExportSecondary.addEventListener('click', () => exportAudio(els.btnExportSecondary.dataset.format || 'mp3'));
+      if (els.btnExportWav24) els.btnExportWav24.addEventListener('click', () => exportAudio('wav24'));
+      if (els.btnExportOpus) els.btnExportOpus.addEventListener('click', () => exportAudio('opus'));
+      if (els.btnBatchExport) els.btnBatchExport.addEventListener('click', openBatchExportModal);
+      if (els.btnBatchSelectAll) els.btnBatchSelectAll.addEventListener('click', () => setAllBatchCheckboxes(true));
+      if (els.btnBatchDeselectAll) els.btnBatchDeselectAll.addEventListener('click', () => setAllBatchCheckboxes(false));
+      if (els.batchExportCancel) els.batchExportCancel.addEventListener('click', () => hideModal(els.batchExportModal));
+      if (els.batchExportStart) els.batchExportStart.addEventListener('click', runBatchExport);
+
+      if (els.lufsTargetSelect) {
+        els.lufsTargetSelect.addEventListener('change', () => {
+          S.lufsTarget = els.lufsTargetSelect.value;
+          S.ui = S.ui || {};
+          S.ui.lufsTarget = S.lufsTarget;
+          schedulePersist();
+          if (S.buffer) updateLufsReadout(S.previewBuf || S.buffer);
+        });
+      }
+
+      // Live Monitor
+      if (els.btnLiveMonitor) els.btnLiveMonitor.addEventListener('click', toggleLiveMonitor);
+      if (els.liveMonitorCancel) els.liveMonitorCancel.addEventListener('click', () => hideModal(els.liveMonitorModal));
+      if (els.liveMonitorConfirm) {
+        els.liveMonitorConfirm.addEventListener('click', () => {
+          hideModal(els.liveMonitorModal);
+          if (els.chkSkipMonitorWarn && els.chkSkipMonitorWarn.checked) S.skipMonitorWarn = true;
+          startLiveMonitor();
+        });
+      }
+
+      // Vocal Cleanup Strip
+      if (els.gateThreshold) {
+        const onGate = () => {
+          S.fx.gateThreshold = parseFloat(els.gateThreshold.value);
+          if (els.gateThresholdVal) els.gateThresholdVal.textContent = S.fx.gateThreshold + ' dB';
+          onFxEdited(false);
+        };
+        els.gateThreshold.addEventListener('input', onGate);
+        els.gateThreshold.addEventListener('change', onGate);
+      }
+      if (els.btnAutoCalibrateGate) els.btnAutoCalibrateGate.addEventListener('click', autoCalibrateGate);
+      if (els.deEssAmount) {
+        const onDeEss = () => {
+          S.fx.deEssAmount = parseFloat(els.deEssAmount.value);
+          if (els.deEssAmountVal) els.deEssAmountVal.textContent = Math.round(S.fx.deEssAmount * 100) + '%';
+          onFxEdited(false);
+        };
+        els.deEssAmount.addEventListener('input', onDeEss);
+        els.deEssAmount.addEventListener('change', onDeEss);
+      }
+      if (els.humNotchSelect) {
+        els.humNotchSelect.addEventListener('change', () => {
+          S.fx.humNotch = parseInt(els.humNotchSelect.value, 10) || 0;
+          onFxEdited(false);
+        });
+      }
+
+      // Visualizer Dock Tabs
+      if (els.visTabWave) els.visTabWave.addEventListener('click', () => setVisMode('waveform'));
+      if (els.visTabSpectrum) els.visTabSpectrum.addEventListener('click', () => setVisMode('spectrum'));
+      if (els.visTabSpectrogram) els.visTabSpectrogram.addEventListener('click', () => setVisMode('spectrogram'));
+
+      // Cue Markers
+      if (els.btnAddMarker) els.btnAddMarker.addEventListener('click', () => addCueMarker());
+      if (els.btnClearMarkers) els.btnClearMarkers.addEventListener('click', clearCueMarkers);
+
+      // Macro XY Pad
+      if (els.xyAxisMode) {
+        els.xyAxisMode.addEventListener('change', () => {
+          S.xyAxisMode = els.xyAxisMode.value;
+          S.ui = S.ui || {};
+          S.ui.xyAxisMode = S.xyAxisMode;
+          updateXyLabels();
+          drawXyPad();
+          schedulePersist();
+        });
+      }
+      if (els.xyPadCanvas) {
+        const pad = els.xyPadCanvas;
+        let dragging = false;
+        pad.addEventListener('pointerdown', (e) => {
+          dragging = true;
+          try { pad.setPointerCapture(e.pointerId); } catch (_) {}
+          pushHistory();
+          handleXyPointer(e);
+        });
+        pad.addEventListener('pointermove', (e) => {
+          if (!dragging) return;
+          handleXyPointer(e);
+        });
+        const endPad = (e) => {
+          if (dragging) {
+            dragging = false;
+            try { pad.releasePointerCapture(e.pointerId); } catch (_) {}
+            schedulePersist();
+            if (S.playing) startPlayback();
+          }
+        };
+        pad.addEventListener('pointerup', endPad);
+        pad.addEventListener('pointercancel', endPad);
+      }
+
       if (els.btnShare) els.btnShare.addEventListener('click', shareLastExport);
       els.btnResetProject.addEventListener('click', () => {
         showModal(els.resetProjectModal);
@@ -4392,6 +5649,17 @@
         updateSkipLabels();
         schedulePersist();
       });
+      if (els.btnEcoToggle) {
+        els.btnEcoToggle.addEventListener('click', toggleEcoModeSetting);
+      }
+      if (els.ecoModeSelect) {
+        els.ecoModeSelect.addEventListener('change', () => {
+          S.ui = S.ui || {};
+          S.ui.ecoMode = ['auto', 'on', 'off'].includes(els.ecoModeSelect.value) ? els.ecoModeSelect.value : 'auto';
+          applyEcoModeState();
+          schedulePersist();
+        });
+      }
       els.exportPref.addEventListener('change', () => {
         S.lastExportFormat = els.exportPref.value === 'mp3' ? 'mp3' : 'wav';
         updateExportButtons();
@@ -4556,16 +5824,24 @@
       window.addEventListener('offline', updateOnline);
 
       // Backdrop click closes modals
-      [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal, els.projectModal].forEach((m) => {
+      [els.saveModal, els.settingsModal, els.moreSkipModal, els.resetAudioModal, els.deleteRecordModal, els.resetProjectModal, els.packModal, els.projectModal, els.liveMonitorModal, els.batchExportModal].forEach((m) => {
         if (!m) return;
         m.addEventListener('click', (e) => {
           if (e.target === m) hideModal(m);
         });
       });
 
-      window.addEventListener('pagehide', flushPersist);
+      const handleAppInactive = () => {
+        flushPersist();
+        if (S.liveMonitoring) stopLiveMonitor();
+        if (S.playing) stopPlayback(false);
+        if (audioCtx && audioCtx.state === 'running') {
+          audioCtx.suspend().catch(() => {});
+        }
+      };
+      window.addEventListener('pagehide', handleAppInactive);
       window.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') flushPersist();
+        if (document.visibilityState === 'hidden') handleAppInactive();
       });
     }
 
@@ -4655,7 +5931,33 @@
       updateTransportEnabled();
       updateTimeChip();
       updateOnline();
+
+      // Initialize Phase 1-4 UI state
+      if (els.gateThreshold) {
+        els.gateThreshold.value = String(S.fx.gateThreshold || -100);
+        if (els.gateThresholdVal) els.gateThresholdVal.textContent = (S.fx.gateThreshold || -100) + ' dB';
+      }
+      if (els.deEssAmount) {
+        els.deEssAmount.value = String(S.fx.deEssAmount || 0);
+        if (els.deEssAmountVal) els.deEssAmountVal.textContent = Math.round((S.fx.deEssAmount || 0) * 100) + '%';
+      }
+      if (els.humNotchSelect) {
+        els.humNotchSelect.value = String(S.fx.humNotch || 0);
+      }
+      if (els.lufsTargetSelect) {
+        els.lufsTargetSelect.value = String(S.lufsTarget || '-14');
+      }
+      if (els.xyAxisMode) {
+        els.xyAxisMode.value = String(S.xyAxisMode || 'pitch-formant');
+      }
+      updateXyLabels();
+      drawXyPad();
+      renderCueMarkers();
+      setVisMode(S.visMode || 'waveform');
+
       wire();
+      initBatteryMonitor();
+      applyEcoModeState();
       resizeWave();
       registerSW();
 

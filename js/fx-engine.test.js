@@ -100,4 +100,104 @@ if (combined.length !== expectedLen) throw new Error('concat crossfade length mi
 if (Math.abs(combined.getChannelData(0)[0] - 0.5) > 1e-5) throw new Error('head sample mismatch');
 if (Math.abs(combined.getChannelData(0)[combined.length - 1] - 0.8) > 1e-5) throw new Error('tail sample mismatch');
 
-console.log('fx-engine smoke ok', { mono: mono.length, wav: wav.size, peaks: peaks.cols, combined: combined.length });
+// Test 1: Noise Gate (Phase 1)
+const gateTestBuf = ctx.createBuffer(1, 2400, 48000);
+for (let i = 0; i < 1200; i++) gateTestBuf.getChannelData(0)[i] = 0.0001; // -80 dB (below -40dB gate)
+for (let i = 1200; i < 2400; i++) gateTestBuf.getChannelData(0)[i] = 0.5;   // -6 dB (above gate)
+const gated = api.applyNoiseGate(gateTestBuf, { thresholdDb: -40, releaseSec: 0.05 });
+if (gated.length !== gateTestBuf.length) throw new Error('gate length mismatch');
+if (Math.abs(gated.getChannelData(0)[100]) > 1e-5) throw new Error('noise gate failed to attenuate quiet portion');
+if (Math.abs(gated.getChannelData(0)[2000]) < 0.3) throw new Error('noise gate muted loud portion');
+
+// Test 2: Hum Notch Filter (Phase 1)
+const humTestBuf = ctx.createBuffer(1, 24000, 48000);
+for (let i = 0; i < 24000; i++) {
+  humTestBuf.getChannelData(0)[i] = Math.sin((2 * Math.PI * 60 * i) / 48000);
+}
+const notched = api.applyHumNotch(humTestBuf, 60);
+if (notched.length !== humTestBuf.length) throw new Error('notch length mismatch');
+let steadyPeak = 0;
+const notchedSamples = notched.getChannelData(0);
+for (let i = 4800; i < 24000; i++) {
+  const a = Math.abs(notchedSamples[i]);
+  if (a > steadyPeak) steadyPeak = a;
+}
+if (steadyPeak > 0.05) throw new Error('hum notch filter failed to attenuate 60Hz frequency: ' + steadyPeak);
+
+// Test 3: De-Esser (Phase 1)
+const sibilanceBuf = ctx.createBuffer(1, 4800, 48000);
+for (let i = 0; i < 4800; i++) {
+  sibilanceBuf.getChannelData(0)[i] = Math.sin((2 * Math.PI * 7000 * i) / 48000) * 0.8;
+}
+const deEssed = api.applyDeEsser(sibilanceBuf, { amount: 0.8, freq: 7000 });
+if (deEssed.length !== sibilanceBuf.length) throw new Error('de-esser length mismatch');
+if (api.peakOf(deEssed) >= api.peakOf(sibilanceBuf)) throw new Error('de-esser failed to reduce high frequency energy');
+
+// Test 4: Phase-Vocoder Pitch Shifter with cents (Phase 2)
+const pvShifted = api.pitchShiftPhaseVocoder(mono, 3, 50); // +3.5 semitones
+if (pvShifted.length !== mono.length) throw new Error('phase vocoder length mismatch');
+
+// Test 5: Harmonizer / Choir Generator (Phase 2)
+const harmonyBuf = api.applyHarmonizer(mono, { harmonyPreset: 'major-chord', harmonyMix: 0.6 });
+if (harmonyBuf.length !== mono.length) throw new Error('harmonizer length mismatch');
+
+// Test 6: 16-Band Synthesizer Vocoder (Phase 2)
+const vocoderBuf = api.applyVocoder(mono, { vocoderMix: 0.7, vocoderCarrier: 'saw', vocoderBands: 16 });
+if (vocoderBuf.length !== mono.length) throw new Error('vocoder length mismatch');
+
+// Test 7: ITU-R BS.1770 LUFS Loudness & Normalization (Phase 4)
+const lufsTestBuf = ctx.createBuffer(1, 48000, 48000);
+for (let i = 0; i < 48000; i++) {
+  lufsTestBuf.getChannelData(0)[i] = Math.sin((2 * Math.PI * 1000 * i) / 48000) * 0.3;
+}
+const initialLufs = api.computeLUFS(lufsTestBuf);
+if (!isFinite(initialLufs.lufs) || initialLufs.lufs < -50 || initialLufs.lufs > 0) {
+  throw new Error('invalid LUFS calculation: ' + initialLufs.lufs);
+}
+const normalized = api.normalizeToLUFS(lufsTestBuf, -14, -1.0);
+const normLufs = api.computeLUFS(normalized);
+if (Math.abs(normLufs.lufs - (-14)) > 1.5) {
+  throw new Error('LUFS normalization deviation too large: ' + normLufs.lufs);
+}
+
+// Test 8: 24-bit Studio WAV export (Phase 4)
+const wav24 = api.bufferToWav24(mono);
+const expected24Size = 44 + mono.length * 3;
+if (typeof wav24.size === 'number' && wav24.size !== expected24Size) {
+  throw new Error('24-bit WAV size mismatch. Expected ' + expected24Size + ', got ' + wav24.size);
+}
+
+// Test 9: Live parameter update on active WebAudio chain (iPad / Power Eco optimization)
+if (typeof chain.updateLiveParams !== 'function') {
+  throw new Error('chain.updateLiveParams missing on buildFxChain result');
+}
+chain.updateLiveParams({
+  bass: 4,
+  treble: -2,
+  highpass: 150,
+  lowpass: 6000,
+  gain: 1.25,
+  distortion: 0.2
+}, { inputGain: 1.8 });
+
+// Test 10: Opus audio export support
+if (typeof api.bufferToOpus !== 'function') {
+  throw new Error('api.bufferToOpus missing');
+}
+api.bufferToOpus(mono).then((opusBlob) => {
+  if (!opusBlob || !(opusBlob instanceof sandbox.Blob || typeof Blob !== 'undefined')) {
+    throw new Error('bufferToOpus failed to return a valid audio blob');
+  }
+}).catch((err) => {
+  throw new Error('bufferToOpus rejected: ' + err);
+});
+
+console.log('fx-engine smoke ok', {
+  mono: mono.length,
+  wav: wav.size,
+  wav24: wav24.size,
+  peaks: peaks.cols,
+  combined: combined.length,
+  lufs: initialLufs.lufs.toFixed(2),
+  normLufs: normLufs.lufs.toFixed(2)
+});

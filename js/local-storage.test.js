@@ -327,4 +327,20 @@ console.log('--- Testing VoxClip Studio LocalStorage Persistence ---');
   console.log('✓ Test 4 passed: A/B comparingDry is non-persistent and always defaults to applying FX (wet)');
 })();
 
+// Test 5: iPad / Power Eco Mode persistence and sanitization
+(() => {
+  assert.ok(appCode.includes("ecoMode: 'auto'"), 'app.js includes ecoMode in defaultPersisted');
+  assert.ok(appCode.includes("ecoMode: (S.ui && S.ui.ecoMode) || 'auto'"), 'app.js snapshots ecoMode');
+  assert.ok(appCode.includes("['auto', 'on', 'off'].includes(p.ui.ecoMode)"), 'app.js validates ecoMode on load');
+
+  const sanitizeEco = (val) => ['auto', 'on', 'off'].includes(val) ? val : 'auto';
+  assert.strictEqual(sanitizeEco('auto'), 'auto', 'auto ecoMode preserved');
+  assert.strictEqual(sanitizeEco('on'), 'on', 'on ecoMode preserved');
+  assert.strictEqual(sanitizeEco('off'), 'off', 'off ecoMode preserved');
+  assert.strictEqual(sanitizeEco('invalid'), 'auto', 'invalid ecoMode falls back to auto');
+  assert.strictEqual(sanitizeEco(null), 'auto', 'null ecoMode falls back to auto');
+
+  console.log('✓ Test 5 passed: iPad and battery Power Eco Mode properly persists and sanitizes');
+})();
+
 console.log('\nAll LocalStorage Persistence tests passed successfully!');
