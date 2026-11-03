@@ -18,6 +18,12 @@
     return 20 * Math.log10(Math.max(1e-9, lin));
   }
 
+  function clampNum(v, min, max, fallback) {
+    const n = Number(v);
+    if (!isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  }
+
   function createFxEngine(deps) {
     const ensureAudioCtx = deps.ensureAudioCtx;
     const getInputGain = deps.getInputGain || (() => 1);
@@ -1193,6 +1199,436 @@
       });
     }
 
+    /* -------------------------------------------------------------
+       Procedural Demo Voice Synthesis (Zero-Bloat Vocal Phrases)
+       ------------------------------------------------------------- */
+    const DEMO_VOICE_CATALOG = [
+      { id: 'baritone', name: 'Baritone Narrative', emoji: '🎙️', desc: 'Warm male speech phrase' },
+      { id: 'alto', name: 'Alto Melodic Voice', emoji: '✨', desc: 'Bright female vocal phrase' },
+      { id: 'storyteller', name: 'Expressive Storyteller', emoji: '📖', desc: 'Dynamic cadence & sibilants' },
+      { id: 'whisper', name: 'Intimate Whisper', emoji: '🤫', desc: 'Aspirated breath speech' },
+      { id: 'scifi', name: 'Sci-Fi Comms Check', emoji: '🛸', desc: 'Staccato technical phrase' }
+    ];
+
+    function getDemoVoices() {
+      return DEMO_VOICE_CATALOG.map((v) => ({ ...v }));
+    }
+
+    // Digital 2-pole resonant bandpass filter for vocal formants
+    function runFormantResonator(input, sr, freq, bw, gain = 1) {
+      const n = input.length;
+      const out = new Float32Array(n);
+      const f = Math.max(80, Math.min(sr * 0.45, freq));
+      const r = Math.exp(-Math.PI * bw / sr);
+      const theta = 2 * Math.PI * f / sr;
+      const a1 = -2 * r * Math.cos(theta);
+      const a2 = r * r;
+      const b0 = (1 - r) * Math.sqrt(1 - 2 * r * Math.cos(2 * theta) + r * r) * gain;
+
+      let y1 = 0, y2 = 0;
+      for (let i = 0; i < n; i++) {
+        const y0 = b0 * input[i] - a1 * y1 - a2 * y2;
+        y2 = y1;
+        y1 = y0;
+        out[i] = y0;
+      }
+      return out;
+    }
+
+    function synthesizeDemoVoice(voiceType = 'baritone', opts = {}) {
+      const ctx = ensureAudioCtx();
+      const sr = opts.sampleRate || (ctx && ctx.sampleRate) || 48000;
+      const type = DEMO_VOICE_CATALOG.some((v) => v.id === voiceType) ? voiceType : 'baritone';
+
+      // Define phrase timings and syllable sequences for each archetype
+      let syllables = [];
+      let baseF0 = 110;
+      let totalDuration = 3.6;
+
+      if (type === 'alto') {
+        baseF0 = 210;
+        totalDuration = 3.7;
+        syllables = [
+          // "Lis-ten to the har-mon-y of sound"
+          { dur: 0.28, f: [340, 2200, 2900], pitch: 0, c: 'l', voiced: true },
+          { dur: 0.24, f: [450, 1800, 2700], pitch: 2, c: 's', voiced: true },
+          { dur: 0.28, f: [380, 1100, 2400], pitch: 4, c: 't', voiced: true },
+          { dur: 0.15, pause: true },
+          { dur: 0.22, f: [500, 1600, 2600], pitch: 3, c: 'th', voiced: true },
+          { dur: 0.32, f: [750, 1300, 2700], pitch: 5, c: 'h', voiced: true },
+          { dur: 0.26, f: [450, 1200, 2500], pitch: 4, c: 'm', voiced: true },
+          { dur: 0.35, f: [360, 2300, 3100], pitch: 2, c: 'n', voiced: true },
+          { dur: 0.18, pause: true },
+          { dur: 0.22, f: [550, 1150, 2500], pitch: 1, c: 'v', voiced: true },
+          { dur: 0.55, f: [650, 1100, 2400], pitch: 0, c: 's', voiced: true }
+        ];
+      } else if (type === 'storyteller') {
+        baseF0 = 145;
+        totalDuration = 4.0;
+        syllables = [
+          // "Once up-on a time in a dis-tant re-alm"
+          { dur: 0.32, f: [550, 1050, 2400], pitch: 1, c: 'w', voiced: true },
+          { dur: 0.26, f: [650, 1250, 2500], pitch: 3, c: 'p', voiced: true },
+          { dur: 0.30, f: [500, 1100, 2400], pitch: 4, c: 'n', voiced: true },
+          { dur: 0.15, pause: true },
+          { dur: 0.20, f: [600, 1400, 2500], pitch: 2, c: 't', voiced: true },
+          { dur: 0.38, f: [700, 1200, 2600], pitch: 5, c: 't', voiced: true },
+          { dur: 0.22, f: [350, 2100, 2700], pitch: 3, c: 'n', voiced: true },
+          { dur: 0.14, pause: true },
+          { dur: 0.25, f: [400, 2000, 2600], pitch: 1, c: 'd', voiced: true },
+          { dur: 0.30, f: [650, 1300, 2500], pitch: -1, c: 't', voiced: true },
+          { dur: 0.18, pause: true },
+          { dur: 0.35, f: [380, 2150, 2750], pitch: 2, c: 'r', voiced: true },
+          { dur: 0.55, f: [500, 1500, 2500], pitch: 0, c: 'l', voiced: true }
+        ];
+      } else if (type === 'whisper') {
+        baseF0 = 120;
+        totalDuration = 3.5;
+        syllables = [
+          // "Se-cret whis-pers in the sha-dows"
+          { dur: 0.34, f: [360, 2150, 2750], pitch: 0, c: 's', voiced: false },
+          { dur: 0.28, f: [480, 1800, 2600], pitch: 1, c: 'k', voiced: false },
+          { dur: 0.32, f: [380, 2000, 2700], pitch: 2, c: 'w', voiced: false },
+          { dur: 0.34, f: [420, 1750, 2550], pitch: 1, c: 'p', voiced: false },
+          { dur: 0.18, pause: true },
+          { dur: 0.24, f: [360, 2050, 2650], pitch: 0, c: 'n', voiced: false },
+          { dur: 0.24, f: [500, 1600, 2500], pitch: -1, c: 'th', voiced: false },
+          { dur: 0.36, f: [650, 1400, 2600], pitch: 1, c: 'sh', voiced: false },
+          { dur: 0.55, f: [480, 1050, 2350], pitch: 0, c: 'd', voiced: false }
+        ];
+      } else if (type === 'scifi') {
+        baseF0 = 128;
+        totalDuration = 3.6;
+        syllables = [
+          // "Comms on-line. Sys-tems rea-dy"
+          { dur: 0.28, f: [550, 1100, 2300], pitch: 0, c: 'k', voiced: true },
+          { dur: 0.26, f: [600, 1150, 2400], pitch: 0, c: 'm', voiced: true },
+          { dur: 0.28, f: [500, 1100, 2350], pitch: 2, c: 'n', voiced: true },
+          { dur: 0.36, f: [400, 2100, 2600], pitch: 4, c: 'l', voiced: true },
+          { dur: 0.20, pause: true },
+          { dur: 0.26, f: [380, 2000, 2600], pitch: 2, c: 's', voiced: true },
+          { dur: 0.28, f: [480, 1750, 2500], pitch: 3, c: 't', voiced: true },
+          { dur: 0.30, f: [420, 2050, 2650], pitch: 2, c: 'm', voiced: true },
+          { dur: 0.16, pause: true },
+          { dur: 0.32, f: [460, 1950, 2600], pitch: 1, c: 'r', voiced: true },
+          { dur: 0.45, f: [350, 2200, 2750], pitch: 0, c: 'd', voiced: true }
+        ];
+      } else {
+        // 'baritone' default
+        baseF0 = 112;
+        totalDuration = 3.8;
+        syllables = [
+          // "Vox-clip stu-di-o trans-forms your voice"
+          { dur: 0.30, f: [500, 1050, 2350], pitch: 0, c: 'v', voiced: true },
+          { dur: 0.28, f: [360, 2050, 2600], pitch: 1, c: 'k', voiced: true },
+          { dur: 0.15, pause: true },
+          { dur: 0.26, f: [320, 950, 2250], pitch: 2, c: 's', voiced: true },
+          { dur: 0.24, f: [450, 1750, 2500], pitch: 3, c: 'd', voiced: true },
+          { dur: 0.32, f: [500, 1050, 2300], pitch: 1, c: 'o', voiced: true },
+          { dur: 0.20, pause: true },
+          { dur: 0.32, f: [620, 1250, 2450], pitch: 2, c: 't', voiced: true },
+          { dur: 0.30, f: [500, 1050, 2350], pitch: 1, c: 'f', voiced: true },
+          { dur: 0.28, f: [400, 1150, 2300], pitch: 0, c: 'y', voiced: true },
+          { dur: 0.55, f: [480, 1100, 2400], pitch: -1, c: 'v', voiced: true }
+        ];
+      }
+
+      const totalFrames = Math.floor(totalDuration * sr);
+      const excitation = new Float32Array(totalFrames);
+      const f1Target = new Float32Array(totalFrames);
+      const f2Target = new Float32Array(totalFrames);
+      const f3Target = new Float32Array(totalFrames);
+      const ampEnvelope = new Float32Array(totalFrames);
+
+      let currentFrame = Math.floor(0.1 * sr);
+      let phase = 0;
+
+      for (const syl of syllables) {
+        const sylFrames = Math.floor(syl.dur * sr);
+        if (syl.pause) {
+          currentFrame += sylFrames;
+          continue;
+        }
+
+        const isVoiced = syl.voiced !== false;
+        const targetPitchHz = baseF0 * Math.pow(2, (syl.pitch || 0) / 12);
+        const [f1, f2, f3] = syl.f || [500, 1500, 2500];
+
+        for (let i = 0; i < sylFrames && (currentFrame + i) < totalFrames; i++) {
+          const idx = currentFrame + i;
+          const pos = i / sylFrames;
+
+          let env = 1;
+          if (pos < 0.15) env = pos / 0.15;
+          else if (pos > 0.8) env = (1 - pos) / 0.2;
+          ampEnvelope[idx] = env;
+
+          f1Target[idx] = f1;
+          f2Target[idx] = f2;
+          f3Target[idx] = f3;
+
+          if (isVoiced) {
+            const vibrato = Math.sin(2 * Math.PI * 5.2 * (idx / sr)) * 0.015;
+            const pitchInc = (targetPitchHz * (1 + vibrato)) / sr;
+            phase += pitchInc;
+            if (phase >= 1) phase -= 1;
+
+            let pulse = 0;
+            if (phase < 0.4) {
+              const t = phase / 0.4;
+              pulse = 3 * t * t - 2 * t * t * t;
+            } else if (phase < 0.55) {
+              pulse = 1 - (phase - 0.4) / 0.15;
+            } else {
+              pulse = 0;
+            }
+            const breath = (Math.random() * 2 - 1) * 0.05;
+            excitation[idx] = (pulse * 2 - 1) * 0.8 + breath;
+          } else {
+            const noise = (Math.random() * 2 - 1);
+            excitation[idx] = noise * 0.75;
+          }
+
+          if (pos < 0.08 && syl.c) {
+            if (syl.c === 's' || syl.c === 'sh') {
+              excitation[idx] += (Math.random() * 2 - 1) * 0.6;
+            } else if (syl.c === 't' || syl.c === 'k' || syl.c === 'p') {
+              excitation[idx] += Math.sin(2 * Math.PI * 2200 * pos) * (1 - pos / 0.08) * 0.5;
+            }
+          }
+        }
+        currentFrame += sylFrames;
+      }
+
+      for (let i = 1; i < totalFrames; i++) {
+        if (f1Target[i] === 0) f1Target[i] = f1Target[i - 1] || 500;
+        if (f2Target[i] === 0) f2Target[i] = f2Target[i - 1] || 1500;
+        if (f3Target[i] === 0) f3Target[i] = f3Target[i - 1] || 2500;
+      }
+
+      let avgF1 = 0, avgF2 = 0, avgF3 = 0, activeCount = 0;
+      for (let i = 0; i < totalFrames; i++) {
+        if (ampEnvelope[i] > 0.05) {
+          avgF1 += f1Target[i];
+          avgF2 += f2Target[i];
+          avgF3 += f3Target[i];
+          activeCount++;
+        }
+      }
+      activeCount = Math.max(1, activeCount);
+      avgF1 /= activeCount;
+      avgF2 /= activeCount;
+      avgF3 /= activeCount;
+
+      const res1 = runFormantResonator(excitation, sr, avgF1 || 500, 80, 1.2);
+      const res2 = runFormantResonator(excitation, sr, avgF2 || 1600, 110, 0.75);
+      const res3 = runFormantResonator(excitation, sr, avgF3 || 2600, 150, 0.45);
+
+      const out = ctx.createBuffer(1, totalFrames, sr);
+      const dest = out.getChannelData(0);
+
+      let peak = 0;
+      for (let i = 0; i < totalFrames; i++) {
+        const raw = (res1[i] + res2[i] + res3[i]) * ampEnvelope[i];
+        dest[i] = raw;
+        const absVal = Math.abs(raw);
+        if (absVal > peak) peak = absVal;
+      }
+
+      if (peak > 1e-6) {
+        const normGain = 0.92 / peak;
+        for (let i = 0; i < totalFrames; i++) dest[i] *= normGain;
+      }
+
+      return out;
+    }
+
+    /* -------------------------------------------------------------
+       Background Ambience & Soundscape Generator + Auto-Ducker
+       ------------------------------------------------------------- */
+    const AMBIENCE_SCENES = [
+      { id: 'none', name: 'Off (No Soundscape)', emoji: '🔇', desc: 'Silence' },
+      { id: 'vinyl', name: 'Vinyl & Tape Crackle', emoji: '💿', desc: 'Warm 60Hz hum and authentic dust clicks' },
+      { id: 'rain', name: 'Rain & Distant Thunder', emoji: '🌧️', desc: 'Smooth rainfall and rolling sub rumbles' },
+      { id: 'starship', name: 'Starship Bridge Hum', emoji: '🛸', desc: 'Deep reactor drone and air ventilation' },
+      { id: 'static', name: 'Radio Telemetry Static', emoji: '📻', desc: 'AM shortwave hiss with drifting whistles' },
+      { id: 'dungeon', name: 'Dungeon Cavern Wind', emoji: '🏰', desc: 'Resonant stone howl and droplet pings' },
+      { id: 'cyberpunk', name: 'Cyberpunk Neon Rain', emoji: '🌆', desc: 'Heavy street downpour and synth pad bed' },
+      { id: 'campfire', name: 'Campfire Crackles', emoji: '🔥', desc: 'Wood snaps, popping sparks and draft roar' }
+    ];
+
+    function getAmbienceScenes() {
+      return AMBIENCE_SCENES.map((s) => ({ ...s }));
+    }
+
+    function generateSoundscapeTrack(sceneId, numFrames, sr, toneDb = 0) {
+      const out = new Float32Array(numFrames);
+      if (!sceneId || sceneId === 'none') return out;
+
+      if (sceneId === 'vinyl') {
+        let humPhase = 0;
+        const humInc = 60 / sr;
+        for (let i = 0; i < numFrames; i++) {
+          humPhase += humInc;
+          const hum = Math.sin(2 * Math.PI * humPhase) * 0.08;
+          const hiss = (Math.random() * 2 - 1) * 0.04;
+          const pop = Math.random() < 0.0018 ? (Math.random() * 2 - 1) * 0.55 : 0;
+          out[i] = hum + hiss + pop;
+        }
+      } else if (sceneId === 'rain') {
+        let b0 = 0, b1 = 0, b2 = 0;
+        let thunderPhase = 0;
+        for (let i = 0; i < numFrames; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99765 * b0 + white * 0.0990460;
+          b1 = 0.96300 * b1 + white * 0.2965164;
+          b2 = 0.57000 * b2 + white * 1.0526913;
+          const rain = (b0 + b1 + b2 + white * 0.5362) * 0.08;
+
+          const t = i / sr;
+          const thunderEnv = Math.max(0, Math.sin(t * 0.45) * Math.sin(t * 1.8));
+          thunderPhase += 55 / sr;
+          const thunder = Math.sin(2 * Math.PI * thunderPhase) * thunderEnv * 0.18;
+          out[i] = rain + thunder;
+        }
+      } else if (sceneId === 'starship') {
+        let p1 = 0, p2 = 0, p3 = 0;
+        let noiseFilter = 0;
+        for (let i = 0; i < numFrames; i++) {
+          p1 += 42 / sr;
+          p2 += 84 / sr;
+          p3 += 126 / sr;
+          const drone = Math.sin(2 * Math.PI * p1) * 0.12 + Math.sin(2 * Math.PI * p2) * 0.06 + Math.sin(2 * Math.PI * p3) * 0.03;
+          const white = Math.random() * 2 - 1;
+          noiseFilter = noiseFilter * 0.94 + white * 0.06;
+          out[i] = drone + noiseFilter * 0.14;
+        }
+      } else if (sceneId === 'static') {
+        let tonePhase = 0;
+        let b0 = 0, b1 = 0;
+        for (let i = 0; i < numFrames; i++) {
+          const t = i / sr;
+          const driftFreq = 1150 + Math.sin(t * 0.8) * 220;
+          tonePhase += driftFreq / sr;
+          const whistle = Math.sin(2 * Math.PI * tonePhase) * 0.04;
+          const white = Math.random() * 2 - 1;
+          b0 = b0 * 0.85 + white * 0.15;
+          b1 = b1 * 0.85 + b0 * 0.15;
+          out[i] = (b1 * 0.4) + whistle;
+        }
+      } else if (sceneId === 'dungeon') {
+        let windFilter = 0;
+        let dropDecay = 0;
+        let dropFreq = 1800;
+        let dropPhase = 0;
+        for (let i = 0; i < numFrames; i++) {
+          const t = i / sr;
+          const sweep = 0.92 + Math.sin(t * 0.35) * 0.04;
+          const white = Math.random() * 2 - 1;
+          windFilter = windFilter * sweep + white * (1 - sweep);
+
+          if (Math.random() < 0.0004 && dropDecay <= 0.01) {
+            dropDecay = 0.45;
+            dropFreq = 1400 + Math.random() * 800;
+          }
+          let ping = 0;
+          if (dropDecay > 0.001) {
+            dropPhase += dropFreq / sr;
+            ping = Math.sin(2 * Math.PI * dropPhase) * dropDecay * 0.2;
+            dropDecay *= 0.9992;
+          }
+          out[i] = (windFilter * 0.22) + ping;
+        }
+      } else if (sceneId === 'cyberpunk') {
+        let padPhase1 = 0, padPhase2 = 0;
+        let noiseF = 0;
+        for (let i = 0; i < numFrames; i++) {
+          padPhase1 += 65 / sr;
+          padPhase2 += 97.5 / sr;
+          const pad = Math.sin(2 * Math.PI * padPhase1) * 0.1 + Math.sin(2 * Math.PI * padPhase2) * 0.07;
+          const white = Math.random() * 2 - 1;
+          noiseF = noiseF * 0.92 + white * 0.08;
+          out[i] = pad + (noiseF * 0.25);
+        }
+      } else if (sceneId === 'campfire') {
+        let roar = 0;
+        for (let i = 0; i < numFrames; i++) {
+          const white = Math.random() * 2 - 1;
+          roar = roar * 0.96 + white * 0.04;
+          const snap = Math.random() < 0.006 ? (Math.random() * 2 - 1) * 0.45 : 0;
+          out[i] = (roar * 0.22) + snap;
+        }
+      }
+
+      if (Math.abs(toneDb) > 0.1) {
+        const toneGain = dbToLin(toneDb);
+        let y1 = 0;
+        for (let i = 0; i < numFrames; i++) {
+          if (toneDb > 0) {
+            const hp = out[i] - y1;
+            y1 = y1 * 0.9 + out[i] * 0.1;
+            out[i] = out[i] + hp * (toneGain - 1) * 0.5;
+          } else {
+            y1 = y1 * 0.85 + out[i] * 0.15;
+            out[i] = y1 * toneGain + out[i] * (1 - toneGain * 0.5);
+          }
+        }
+      }
+
+      return out;
+    }
+
+    function applyAmbienceSoundscape(voiceBuf, fx, opts = {}) {
+      if (!voiceBuf) return voiceBuf;
+      const sceneId = fx.ambiencePreset || 'none';
+      const mix = Number(fx.ambienceMix) || 0;
+      if (sceneId === 'none' || mix <= 0.001) return voiceBuf;
+
+      const duckAmount = clampNum(fx.ambienceDuck != null ? fx.ambienceDuck : 0.55, 0, 1, 0.55);
+      const toneDb = clampNum(fx.ambienceTone != null ? fx.ambienceTone : 0, -12, 12, 0);
+
+      const ctx = ensureAudioCtx();
+      const sr = voiceBuf.sampleRate;
+      const n = voiceBuf.length;
+      const out = ctx.createBuffer(1, n, sr);
+      const dest = out.getChannelData(0);
+      const voiceSrc = voiceBuf.getChannelData(0);
+
+      const soundscape = generateSoundscapeTrack(sceneId, n, sr, toneDb);
+
+      const attackCoeff = Math.exp(-1 / (0.008 * sr));
+      const releaseCoeff = Math.exp(-1 / (0.28 * sr));
+      let voiceEnv = 0;
+
+      let peak = 0;
+      for (let i = 0; i < n; i++) {
+        const v = voiceSrc[i];
+        const absV = Math.abs(v);
+        if (absV > voiceEnv) {
+          voiceEnv = attackCoeff * voiceEnv + (1 - attackCoeff) * absV;
+        } else {
+          voiceEnv = releaseCoeff * voiceEnv + (1 - releaseCoeff) * absV;
+        }
+
+        const speechActivity = Math.min(1, voiceEnv * 3.5);
+        const duckGain = 1 - (speechActivity * duckAmount * 0.85);
+
+        const ambSample = soundscape[i] * mix * duckGain;
+        const blended = v + ambSample;
+        dest[i] = blended;
+
+        const a = Math.abs(blended);
+        if (a > peak) peak = a;
+      }
+
+      if (peak > 0.95) {
+        const limiter = 0.95 / peak;
+        for (let i = 0; i < n; i++) dest[i] *= limiter;
+      }
+
+      return out;
+    }
+
     return {
       cloneBuffer,
       concatBuffersWithCrossfade,
@@ -1215,6 +1651,11 @@
       normalizeToLUFS,
       buildPeakPyramid,
       buildFxChain,
+      getDemoVoices,
+      synthesizeDemoVoice,
+      getAmbienceScenes,
+      generateSoundscapeTrack,
+      applyAmbienceSoundscape,
       bufferToWav,
       bufferToWav24,
       bufferToOpus,

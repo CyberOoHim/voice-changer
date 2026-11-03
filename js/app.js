@@ -93,7 +93,12 @@
       harmonyMix: 0,
       vocoderMix: 0,
       vocoderCarrier: 'saw',
-      vocoderBands: 16
+      vocoderBands: 16,
+      // Phase 3 Ambience & Soundscape
+      ambiencePreset: 'none',
+      ambienceMix: 0,
+      ambienceDuck: 0.55,
+      ambienceTone: 0
     };
 
     const defaultFx = () => ({ ...DEFAULT_FX_VALUES });
@@ -180,6 +185,21 @@
         { key: 'gain', label: 'FX gain', min: 0, max: 3, step: 0.01, unit: '×' },
         { key: 'compressorThresh', label: 'Comp thresh', min: -60, max: 0, step: 1, unit: 'dB' },
         { key: 'compressorRatio', label: 'Comp ratio', min: 1, max: 20, step: 0.1, unit: ':1' }
+      ]},
+      { group: 'Background Ambience', params: [
+        { key: 'ambiencePreset', label: 'Soundscape scene', type: 'select', options: [
+          { value: 'none', label: 'Off (No Soundscape)' },
+          { value: 'vinyl', label: 'Vinyl & Tape Crackle' },
+          { value: 'rain', label: 'Rain & Distant Thunder' },
+          { value: 'starship', label: 'Starship Bridge Hum' },
+          { value: 'static', label: 'Radio Telemetry Static' },
+          { value: 'dungeon', label: 'Dungeon Cavern Wind' },
+          { value: 'cyberpunk', label: 'Cyberpunk Neon Rain' },
+          { value: 'campfire', label: 'Campfire Crackles' }
+        ]},
+        { key: 'ambienceMix', label: 'Ambience mix', min: 0, max: 0.8, step: 0.01, unit: '' },
+        { key: 'ambienceDuck', label: 'Voice auto-duck', min: 0, max: 1, step: 0.01, unit: '' },
+        { key: 'ambienceTone', label: 'Ambience tone', min: -6, max: 6, step: 0.5, unit: 'dB' }
       ]}
     ];
 
@@ -673,7 +693,20 @@
       panelXyCleanup: $('panelXyCleanup'),
       panelLab: $('panelLab'),
       panelExport: $('panelExport'),
-      catFilterBar: $('catFilterBar')
+      catFilterBar: $('catFilterBar'),
+      demoVoiceRow: $('demoVoiceRow'),
+      demoVoiceSelect: $('demoVoiceSelect'),
+      btnLoadDemoVoice: $('btnLoadDemoVoice'),
+      ambienceDetails: $('ambienceDetails'),
+      ambiencePresetSelect: $('ambiencePresetSelect'),
+      ambienceQuickChips: $('ambienceQuickChips'),
+      ambienceMix: $('ambienceMix'),
+      ambienceMixVal: $('ambienceMixVal'),
+      ambienceDuck: $('ambienceDuck'),
+      ambienceDuckVal: $('ambienceDuckVal'),
+      ambienceTone: $('ambienceTone'),
+      ambienceToneVal: $('ambienceToneVal'),
+      btnClearAmbience: $('btnClearAmbience')
     };
 
     /* =========================================================
@@ -755,6 +788,7 @@
     }
 
     function isFxWet() {
+      if (S.fx.ambiencePreset && S.fx.ambiencePreset !== 'none' && (S.fx.ambienceMix || 0) > 0.001) return true;
       if (!fxEqualsDefault(S.fx)) return true;
       const defIn = defaultInputGain();
       return Math.abs((S.inputGain || 1) - defIn) > 1e-4;
@@ -917,6 +951,10 @@
     const bufferToOpus = fxApi.bufferToOpus;
     const bufferToBase64Wav = fxApi.bufferToBase64Wav;
     const base64ToArrayBuffer = fxApi.base64ToArrayBuffer;
+    const getDemoVoices = fxApi.getDemoVoices;
+    const synthesizeDemoVoice = fxApi.synthesizeDemoVoice;
+    const getAmbienceScenes = fxApi.getAmbienceScenes;
+    const applyAmbienceSoundscape = fxApi.applyAmbienceSoundscape;
 
     /* =========================================================
        Persistence
@@ -1528,7 +1566,7 @@
           out[k] = m > 0.05 ? v : d[k];
           continue;
         }
-        if (k === 'vocoderBands' || k === 'humNotch') {
+        if (k === 'vocoderBands' || k === 'humNotch' || k === 'ambiencePreset') {
           out[k] = m >= 0.25 ? v : d[k];
           continue;
         }
@@ -1568,7 +1606,7 @@
           k === 'bpMix' || k === 'distortion' || k === 'noiseMix' || k === 'reverbMix' ||
           k === 'delayMix' || k === 'chorus' || k === 'flanger' || k === 'tremolo' ||
           k === 'vibrato' || k === 'sampleRateCrush' || k === 'bitcrush' || k === 'fadeIn' || k === 'fadeOut' ||
-          k === 'harmonyMix' || k === 'vocoderMix' || k === 'deEssAmount'
+          k === 'harmonyMix' || k === 'vocoderMix' || k === 'deEssAmount' || k === 'ambienceMix' || k === 'ambienceDuck'
         ) {
           out[k] = (out[k] || 0) + v * (1 - Math.min(1, Math.max(0, out[k] || 0)));
           continue;
@@ -1598,9 +1636,10 @@
       out.mid = Math.max(-12, Math.min(12, out.mid));
       out.treble = Math.max(-12, Math.min(12, out.treble));
       out.gateThreshold = Math.max(-100, Math.min(-20, out.gateThreshold ?? -100));
-      for (const mk of ['bpMix', 'distortion', 'noiseMix', 'reverbMix', 'delayMix', 'chorus', 'flanger', 'tremolo', 'vibrato', 'sampleRateCrush', 'bitcrush', 'harmonyMix', 'vocoderMix', 'deEssAmount']) {
+      for (const mk of ['bpMix', 'distortion', 'noiseMix', 'reverbMix', 'delayMix', 'chorus', 'flanger', 'tremolo', 'vibrato', 'sampleRateCrush', 'bitcrush', 'harmonyMix', 'vocoderMix', 'deEssAmount', 'ambienceMix', 'ambienceDuck']) {
         out[mk] = Math.max(0, Math.min(1, out[mk] || 0));
       }
+      out.ambienceTone = Math.max(-6, Math.min(6, out.ambienceTone || 0));
       out.lowpass = Math.max(200, Math.min(18000, out.lowpass));
       out.highpass = Math.max(20, Math.min(4000, out.highpass));
       return out;
@@ -1865,7 +1904,8 @@
       'pitchSemi', 'pitchCents', 'pitchMode', 'reverse',
       'harmonyPreset', 'harmonyMix', 'vocoderMix', 'vocoderCarrier', 'vocoderBands',
       'gateThreshold', 'gateRelease', 'deEssAmount', 'deEssFreq', 'humNotch',
-      'fadeIn', 'fadeOut', 'bitcrush', 'sampleRateCrush', 'speed'
+      'fadeIn', 'fadeOut', 'bitcrush', 'sampleRateCrush', 'speed',
+      'ambiencePreset', 'ambienceMix', 'ambienceDuck', 'ambienceTone'
     ];
 
     function getOfflineDspFingerprint(fx) {
@@ -1917,6 +1957,9 @@
 
       if ((S.fx.fadeIn || 0) > 0.001 || (S.fx.fadeOut || 0) > 0.001 || (S.fx.bitcrush || 0) > 0.001 || (S.fx.sampleRateCrush || 0) > 0.001) {
         b = applyFadesAndCrush(b, S.fx);
+      }
+      if ((S.fx.ambienceMix || 0) > 0.001 && S.fx.ambiencePreset && S.fx.ambiencePreset !== 'none') {
+        b = applyAmbienceSoundscape(b, S.fx);
       }
       S.previewBuf = b;
       updateLufsReadout(b);
@@ -3582,6 +3625,9 @@
       let rendered = await offline.startRendering();
       rendered = toMonoBuffer(rendered);
       rendered = applyPeakLimiter(rendered, LIMITER_PEAK);
+      if ((fx.ambienceMix || 0) > 0.001 && fx.ambiencePreset && fx.ambiencePreset !== 'none') {
+        rendered = applyAmbienceSoundscape(rendered, fx);
+      }
       return rendered;
     }
 
@@ -4307,6 +4353,7 @@
       const root = els.fxPanel;
       root.replaceChildren();
       syncVocalCleanupUI();
+      syncAmbienceUI();
       for (const group of FX_META) {
         const sec = document.createElement('div');
         sec.className = 'fx-group';
@@ -4473,6 +4520,66 @@
       }
     }
 
+    function syncAmbienceUI() {
+      const preset = S.fx.ambiencePreset || 'none';
+      const mix = S.fx.ambienceMix != null ? S.fx.ambienceMix : 0;
+      const duck = S.fx.ambienceDuck != null ? S.fx.ambienceDuck : 0.55;
+      const tone = S.fx.ambienceTone != null ? S.fx.ambienceTone : 0;
+
+      if (els.ambiencePresetSelect) {
+        els.ambiencePresetSelect.value = preset;
+      }
+      if (els.ambienceQuickChips) {
+        els.ambienceQuickChips.querySelectorAll('.ambience-chip-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.scene === preset);
+        });
+      }
+      if (els.ambienceMix) {
+        els.ambienceMix.value = String(mix);
+        if (els.ambienceMixVal) els.ambienceMixVal.textContent = Math.round(mix * 100) + '%';
+      }
+      if (els.ambienceDuck) {
+        els.ambienceDuck.value = String(duck);
+        if (els.ambienceDuckVal) els.ambienceDuckVal.textContent = Math.round(duck * 100) + '%';
+      }
+      if (els.ambienceTone) {
+        els.ambienceTone.value = String(tone);
+        if (els.ambienceToneVal) {
+          const sign = tone > 0 ? '+' : '';
+          els.ambienceToneVal.textContent = sign + tone.toFixed(1) + ' dB';
+        }
+      }
+    }
+
+    async function loadDemoVoice(voiceType) {
+      if (S.baking || S.recording || S.loading) return;
+      const voices = getDemoVoices ? getDemoVoices() : [];
+      const vObj = voices.find((v) => v.id === voiceType) || voices[0];
+      const label = vObj ? vObj.name : voiceType;
+
+      if (S.buffer) {
+        const ok = await studioConfirm('Load demo speech sample “' + label + '”? Current audio will be replaced.', {
+          title: 'Load Demo Speech',
+          confirmText: 'Load Demo'
+        });
+        if (!ok) return;
+      }
+
+      try {
+        ensureAudioCtx();
+        const demoBuf = synthesizeDemoVoice(voiceType || 'baritone');
+        if (!demoBuf) throw new Error('Demo synthesis failed');
+        setBuffer(demoBuf, {
+          name: 'Demo: ' + label,
+          clearVideo: true
+        });
+        toast('Loaded demo voice: ' + label, 'ok');
+      } catch (err) {
+        console.error(err);
+        toast('Failed to generate demo voice sample.', 'error');
+      }
+    }
+
     function onFxEdited(restart = true, opts = {}) {
       if (opts.pushHistory) pushHistory();
       // Manual slider drift: keep chain badges until values no longer match chain recipe
@@ -4499,6 +4606,7 @@
         }
       }
       syncVocalCleanupUI();
+      syncAmbienceUI();
       renderPresets();
       updateChainBar();
       updateTransportEnabled();
@@ -5757,6 +5865,80 @@
         });
       }
 
+      // Demo Voice Speech Loader
+      if (els.btnLoadDemoVoice && els.demoVoiceSelect) {
+        els.btnLoadDemoVoice.addEventListener('click', () => {
+          loadDemoVoice(els.demoVoiceSelect.value);
+        });
+      }
+
+      // Background Ambience & Soundscape Mixer
+      if (els.ambiencePresetSelect) {
+        els.ambiencePresetSelect.addEventListener('change', () => {
+          pushHistory();
+          S.fx.ambiencePreset = els.ambiencePresetSelect.value;
+          if (S.fx.ambiencePreset !== 'none' && (S.fx.ambienceMix || 0) < 0.05) {
+            S.fx.ambienceMix = 0.25;
+          }
+          syncAmbienceUI();
+          onFxEdited(false);
+        });
+      }
+      if (els.ambienceQuickChips) {
+        els.ambienceQuickChips.addEventListener('click', (e) => {
+          const chip = e.target.closest('.ambience-chip-btn');
+          if (!chip) return;
+          pushHistory();
+          const scene = chip.dataset.scene || 'none';
+          S.fx.ambiencePreset = scene;
+          if (scene !== 'none' && (S.fx.ambienceMix || 0) < 0.05) {
+            S.fx.ambienceMix = 0.25;
+          }
+          syncAmbienceUI();
+          onFxEdited(false);
+        });
+      }
+      if (els.ambienceMix) {
+        const onAmbMix = () => {
+          S.fx.ambienceMix = parseFloat(els.ambienceMix.value);
+          if (els.ambienceMixVal) els.ambienceMixVal.textContent = Math.round(S.fx.ambienceMix * 100) + '%';
+          onFxEdited(false);
+        };
+        els.ambienceMix.addEventListener('input', onAmbMix);
+        els.ambienceMix.addEventListener('change', onAmbMix);
+      }
+      if (els.ambienceDuck) {
+        const onAmbDuck = () => {
+          S.fx.ambienceDuck = parseFloat(els.ambienceDuck.value);
+          if (els.ambienceDuckVal) els.ambienceDuckVal.textContent = Math.round(S.fx.ambienceDuck * 100) + '%';
+          onFxEdited(false);
+        };
+        els.ambienceDuck.addEventListener('input', onAmbDuck);
+        els.ambienceDuck.addEventListener('change', onAmbDuck);
+      }
+      if (els.ambienceTone) {
+        const onAmbTone = () => {
+          S.fx.ambienceTone = parseFloat(els.ambienceTone.value);
+          if (els.ambienceToneVal) {
+            const sign = S.fx.ambienceTone > 0 ? '+' : '';
+            els.ambienceToneVal.textContent = sign + S.fx.ambienceTone.toFixed(1) + ' dB';
+          }
+          onFxEdited(false);
+        };
+        els.ambienceTone.addEventListener('input', onAmbTone);
+        els.ambienceTone.addEventListener('change', onAmbTone);
+      }
+      if (els.btnClearAmbience) {
+        els.btnClearAmbience.addEventListener('click', () => {
+          pushHistory();
+          S.fx.ambiencePreset = 'none';
+          S.fx.ambienceMix = 0;
+          syncAmbienceUI();
+          onFxEdited(false);
+          toast('Background soundscape muted');
+        });
+      }
+
       // Visualizer Dock Tabs
       if (els.visTabWave) els.visTabWave.addEventListener('click', () => setVisMode('waveform'));
       if (els.visTabSpectrum) els.visTabSpectrum.addEventListener('click', () => setVisMode('spectrum'));
@@ -6184,6 +6366,7 @@
       updateXyLabels();
       drawXyPad();
       renderCueMarkers();
+      syncAmbienceUI();
       setVisMode(S.visMode || 'waveform');
 
       wire();

@@ -230,6 +230,44 @@ if (!preBakedChain || !preBakedChain.input || !preBakedChain.output) {
   throw new Error('preBaked buildFxChain failed');
 }
 
+// Test 12: Procedural Demo Voice Synthesis
+const demoVoices = api.getDemoVoices();
+if (!Array.isArray(demoVoices) || demoVoices.length < 5) {
+  throw new Error('getDemoVoices invalid: ' + JSON.stringify(demoVoices));
+}
+for (const dv of demoVoices) {
+  const synthBuf = api.synthesizeDemoVoice(dv.id, { sampleRate: 48000 });
+  if (!synthBuf || synthBuf.numberOfChannels !== 1 || synthBuf.length < 48000 * 2) {
+    throw new Error('synthesizeDemoVoice failed for ' + dv.id);
+  }
+  const pk = api.peakOf(synthBuf);
+  if (pk < 0.2 || pk > 1.0) {
+    throw new Error('synthesizeDemoVoice peak out of bounds for ' + dv.id + ': ' + pk);
+  }
+}
+
+// Test 13: Background Ambience Soundscapes & Voice Auto-Ducker
+const scenes = api.getAmbienceScenes();
+if (!Array.isArray(scenes) || scenes.length < 8) {
+  throw new Error('getAmbienceScenes invalid: ' + JSON.stringify(scenes));
+}
+for (const scene of scenes) {
+  if (scene.id === 'none') continue;
+  const ambMix = api.applyAmbienceSoundscape(mono, {
+    ambiencePreset: scene.id,
+    ambienceMix: 0.35,
+    ambienceDuck: 0.6,
+    ambienceTone: 2
+  });
+  if (!ambMix || ambMix.numberOfChannels !== 1 || ambMix.length !== mono.length) {
+    throw new Error('applyAmbienceSoundscape failed for ' + scene.id);
+  }
+  const pk = api.peakOf(ambMix);
+  if (pk <= 0 || pk > 1.0) {
+    throw new Error('applyAmbienceSoundscape peak invalid for ' + scene.id + ': ' + pk);
+  }
+}
+
 console.log('fx-engine smoke ok', {
   mono: mono.length,
   wav: wav.size,
@@ -238,6 +276,9 @@ console.log('fx-engine smoke ok', {
   combined: combined.length,
   lufs: initialLufs.lufs.toFixed(2),
   normLufs: normLufs.lufs.toFixed(2),
-  presets: presetsRaw.presets.length
+  presets: presetsRaw.presets.length,
+  demoVoices: demoVoices.length,
+  ambienceScenes: scenes.length
 });
+
 

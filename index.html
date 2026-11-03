@@ -1653,6 +1653,92 @@
       color: #7dd3fc;
       font-weight: 700;
     }
+
+    /* Demo Voice Selector */
+    .demo-voice-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      background: rgba(15, 23, 32, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .82rem;
+      flex-wrap: wrap;
+    }
+    .demo-voice-title {
+      font-weight: 700;
+      color: var(--accent);
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      white-space: nowrap;
+    }
+    .demo-voice-select {
+      flex: 1 1 auto;
+      min-width: 140px;
+      min-height: 36px;
+      padding: 0.35rem 0.6rem;
+      border-radius: 8px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-size: .82rem;
+      color: var(--text);
+    }
+    .btn-demo-voice {
+      min-height: 36px;
+      padding: 0.35rem 0.85rem;
+      font-size: .8rem;
+      font-weight: 600;
+      border-radius: 8px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #7dd3fc;
+      white-space: nowrap;
+      transition: background .15s, border-color .15s, filter .15s;
+    }
+    .btn-demo-voice:hover:not(:disabled) {
+      background: rgba(56, 189, 248, 0.28);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Soundscape Ambience Chips */
+    .ambience-chips {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 4px 1px 8px;
+      margin-bottom: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .ambience-chips::-webkit-scrollbar { height: 3px; }
+    .ambience-chips::-webkit-scrollbar-thumb { background: #233448; border-radius: 999px; }
+    .ambience-chip-btn {
+      min-height: 34px;
+      padding: 0.3rem 0.75rem;
+      font-size: .78rem;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 32, 0.6);
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .ambience-chip-btn:hover {
+      color: var(--text);
+      border-color: #3a516b;
+    }
+    .ambience-chip-btn.active {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: var(--accent);
+      color: #7dd3fc;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -1744,6 +1830,17 @@
           <div id="recHistoryBar" class="rec-history-bar" hidden>
             <span id="recTakeBadge" class="rec-take-badge" aria-live="polite">Take 1 of 1</span>
             <span class="rec-take-hint">FIFO buffer · max 10 takes</span>
+          </div>
+          <div class="demo-voice-row" id="demoVoiceRow" aria-label="Procedural demo voice phrases">
+            <span class="demo-voice-title">🗣️ Demo Voice:</span>
+            <select id="demoVoiceSelect" class="demo-voice-select" aria-label="Pick procedural demo voice phrase">
+              <option value="baritone" selected>🎙️ Baritone Narrative</option>
+              <option value="alto">✨ Alto Melodic Voice</option>
+              <option value="storyteller">📖 Expressive Storyteller</option>
+              <option value="whisper">🤫 Intimate Whisper</option>
+              <option value="scifi">🛸 Sci-Fi Comms Check</option>
+            </select>
+            <button type="button" id="btnLoadDemoVoice" class="btn-demo-voice" aria-label="Load demo voice phrase" title="Instantly test voice presets without a microphone">Load Demo</button>
           </div>
           <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio, video, or .voxproject files here">
             <strong>Drop audio, video or .voxproject</strong>
@@ -1949,6 +2046,67 @@
                       <option value="60">60 Hz Notch (+ 120Hz Harmonic)</option>
                     </select>
                   </div>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <!-- BACKGROUND AMBIENCE & FOLEY SOUNDSCAPE SUB-PANEL -->
+          <div style="margin-top:14px;">
+            <details id="ambienceDetails" class="cleanup-details" open>
+              <summary>Background Ambience &amp; Soundscape Mixer</summary>
+              <div class="ambience-wrap" style="padding-top:6px;">
+                <div class="row spread" style="align-items:center;margin-bottom:8px;">
+                  <label for="ambiencePresetSelect" style="font-size:.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Soundscape Environment</label>
+                  <button type="button" id="btnClearAmbience" class="btn-xs" aria-label="Mute background ambience" title="Turn off background ambience">Mute Ambience</button>
+                </div>
+                <select id="ambiencePresetSelect" aria-label="Background Soundscape Environment" style="width:100%;min-height:36px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 10px;font-size:.84rem;margin-bottom:8px;">
+                  <option value="none" selected>🔇 Off (No Soundscape)</option>
+                  <option value="vinyl">💿 Vinyl &amp; Tape Crackle</option>
+                  <option value="rain">🌧️ Rain &amp; Distant Thunder</option>
+                  <option value="starship">🛸 Starship Bridge Hum</option>
+                  <option value="static">📻 Radio Telemetry Static</option>
+                  <option value="dungeon">🏰 Dungeon Cavern Wind</option>
+                  <option value="cyberpunk">🌆 Cyberpunk Neon Rain</option>
+                  <option value="campfire">🔥 Campfire Crackles</option>
+                </select>
+                <div class="ambience-chips" id="ambienceQuickChips" role="group" aria-label="Quick soundscape selector">
+                  <button type="button" class="ambience-chip-btn active" data-scene="none">Off</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="vinyl">💿 Vinyl</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="rain">🌧️ Rain</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="starship">🛸 Sci-Fi</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="static">📻 Static</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="dungeon">🏰 Wind</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="cyberpunk">🌆 City</button>
+                  <button type="button" class="ambience-chip-btn" data-scene="campfire">🔥 Fire</button>
+                </div>
+                <div class="cleanup-grid" style="margin-top:8px;">
+                  <div class="cleanup-col">
+                    <div class="gain-row">
+                      <header>
+                        <strong>Ambience Mix</strong>
+                        <span id="ambienceMixVal" class="val">0%</span>
+                      </header>
+                      <input type="range" id="ambienceMix" min="0" max="0.8" step="0.01" value="0" aria-label="Ambience volume mix level" />
+                    </div>
+                  </div>
+                  <div class="cleanup-col">
+                    <div class="gain-row">
+                      <header>
+                        <strong>Voice Auto-Duck</strong>
+                        <span id="ambienceDuckVal" class="val">55%</span>
+                      </header>
+                      <input type="range" id="ambienceDuck" min="0" max="1" step="0.01" value="0.55" aria-label="Voice sidechain auto-ducking depth" />
+                    </div>
+                  </div>
+                </div>
+                <div class="gain-row" style="margin-top:8px;">
+                  <header>
+                    <strong>Ambience Tone</strong>
+                    <span id="ambienceToneVal" class="val">Neutral</span>
+                  </header>
+                  <input type="range" id="ambienceTone" min="-6" max="6" step="0.5" value="0" aria-label="Ambience tone tilt EQ" />
+                  <p class="hint">Adjusts spectral brightness so background atmosphere never masks speech intelligibility.</p>
                 </div>
               </div>
             </details>
