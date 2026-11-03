@@ -192,6 +192,44 @@ api.bufferToOpus(mono).then((opusBlob) => {
   throw new Error('bufferToOpus rejected: ' + err);
 });
 
+// Test 11: Curated FX Presets catalog & preBaked buildFxChain validation
+const presetsRaw = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fx-presets.json'), 'utf8'));
+if (!Array.isArray(presetsRaw.categories) || presetsRaw.categories.length !== 7 || !presetsRaw.categories.includes('FX & Utility')) {
+  throw new Error('fx-presets.json categories invalid: ' + JSON.stringify(presetsRaw.categories));
+}
+if (!Array.isArray(presetsRaw.presets) || presetsRaw.presets.length < 60 || presetsRaw.presets.length > 70) {
+  throw new Error('Expected 60-70 curated presets, got ' + (presetsRaw.presets && presetsRaw.presets.length));
+}
+const seenIds = new Set();
+let vocoderCount = 0;
+let harmonyCount = 0;
+let deEssCount = 0;
+for (const p of presetsRaw.presets) {
+  if (!p.id || !p.name || !presetsRaw.categories.includes(p.cat) || !p.fx) {
+    throw new Error('Invalid preset entry: ' + JSON.stringify(p));
+  }
+  if (seenIds.has(p.id)) throw new Error('Duplicate preset id: ' + p.id);
+  seenIds.add(p.id);
+  if (typeof p.fx.pitchSemi === 'number' && (p.fx.pitchSemi < -12 || p.fx.pitchSemi > 12)) {
+    throw new Error('Preset ' + p.id + ' pitchSemi out of bounds: ' + p.fx.pitchSemi);
+  }
+  if (p.fx.vocoderMix > 0) vocoderCount++;
+  if (p.fx.harmonyMix > 0 && p.fx.harmonyPreset && p.fx.harmonyPreset !== 'none') harmonyCount++;
+  if (p.fx.deEssAmount > 0) deEssCount++;
+}
+if (vocoderCount === 0 || harmonyCount === 0 || deEssCount === 0) {
+  throw new Error('Expected active vocoder, harmonizer, and de-esser presets in catalog');
+}
+const preBakedChain = api.buildFxChain(ctx, Object.assign({}, presetsRaw.defaultFx, {
+  harmonyPreset: 'octave-dual',
+  harmonyMix: 0.4,
+  deEssAmount: 0.5,
+  humNotch: 60
+}), { live: false, preBaked: true, duration: 2 });
+if (!preBakedChain || !preBakedChain.input || !preBakedChain.output) {
+  throw new Error('preBaked buildFxChain failed');
+}
+
 console.log('fx-engine smoke ok', {
   mono: mono.length,
   wav: wav.size,
@@ -199,5 +237,7 @@ console.log('fx-engine smoke ok', {
   peaks: peaks.cols,
   combined: combined.length,
   lufs: initialLufs.lufs.toFixed(2),
-  normLufs: normLufs.lufs.toFixed(2)
+  normLufs: normLufs.lufs.toFixed(2),
+  presets: presetsRaw.presets.length
 });
+

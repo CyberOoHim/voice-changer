@@ -599,8 +599,8 @@
 
       let head = input;
 
-      // Stage 0A: Hum Notch Filter (50Hz or 60Hz)
-      if (fx.humNotch && (fx.humNotch === 50 || fx.humNotch === 60)) {
+      // Stage 0A: Hum Notch Filter (50Hz or 60Hz) — only when not already baked offline
+      if (!opts.preBaked && fx.humNotch && (fx.humNotch === 50 || fx.humNotch === 60)) {
         const notch1 = ctx.createBiquadFilter();
         notch1.type = 'notch';
         notch1.frequency.value = fx.humNotch;
@@ -616,8 +616,8 @@
         head = notch2;
       }
 
-      // Stage 0B: Sibilance De-Esser (4.5k - 9kHz peaking notch)
-      if ((fx.deEssAmount || 0) > 0.001) {
+      // Stage 0B: Sibilance De-Esser (4.5k - 9kHz peaking notch) — only when not already baked offline
+      if (!opts.preBaked && (fx.deEssAmount || 0) > 0.001) {
         const deEsser = ctx.createBiquadFilter();
         deEsser.type = 'peaking';
         deEsser.frequency.value = fx.deEssFreq || 6500;
@@ -736,8 +736,8 @@
         head = merge;
       }
 
-      // Harmonizer live detune branch if active
-      if ((fx.harmonyMix || 0) > 0.001 && fx.harmonyPreset && fx.harmonyPreset !== 'none') {
+      // Harmonizer live detune branch if active (only when not already baked via Phase-Vocoder)
+      if (!opts.preBaked && (fx.harmonyMix || 0) > 0.001 && fx.harmonyPreset && fx.harmonyPreset !== 'none') {
         const harmMerge = ctx.createGain();
         const dryBranch = ctx.createGain();
         const wetBranch = ctx.createGain();

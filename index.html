@@ -18,13 +18,18 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <title>VoxClip Studio</title>
   <style>
     :root {
-      --bg: #0b0f14;
-      --bg2: #121821;
-      --bg3: #1a2330;
-      --border: #243041;
+      --bg: #080d14;
+      --bg2: #0f1622;
+      --bg3: #162030;
+      --bg-dock: #0c121b;
+      --border: #202d40;
+      --border-bright: #2d3f57;
       --text: #e8eef7;
       --muted: #8b9bb0;
       --accent: #38bdf8;
@@ -33,9 +38,10 @@
       --ok: #34d399;
       --warn: #fbbf24;
       --radius: 14px;
-      --shadow: 0 8px 28px rgba(0,0,0,.35);
+      --shadow: 0 10px 32px rgba(0,0,0,.45);
       --touch: 44px;
-      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      --font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -96,9 +102,9 @@
       50% { box-shadow: 0 0 0 8px rgba(244,63,94,0); }
     }
     .app {
-      max-width: 980px;
+      max-width: 1320px;
       margin: 0 auto;
-      padding: max(12px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom));
+      padding: max(12px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
     }
     header.app-header {
       display: flex;
@@ -1338,6 +1344,315 @@
       background: linear-gradient(90deg, var(--accent), var(--ok));
       transition: width .15s;
     }
+
+    /* =========================================================
+       PRO HARDWARE CONSOLE & IPAD TOUCH CONTROLS
+       ========================================================= */
+
+    /* Tactile Hardware Fader Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 44px; /* full finger touch target */
+      background: transparent;
+      cursor: pointer;
+      touch-action: pan-x;
+      margin: 0;
+      padding: 0;
+    }
+    input[type="range"]:focus-visible {
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #0d1522;
+      border: 1px solid #1e2c3f;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 28px;
+      height: 32px;
+      margin-top: -12px;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #2a3d54 0%, #172433 50%, #0d1520 100%);
+      border: 1.5px solid #38bdf8;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.3);
+      cursor: grab;
+      position: relative;
+    }
+    input[type="range"]:active::-webkit-slider-thumb {
+      cursor: grabbing;
+      border-color: #22d3ee;
+      background: linear-gradient(180deg, #36506f 0%, #1e2f42 50%, #111a27 100%);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.45), inset 0 1px 1px rgba(255,255,255,0.4);
+    }
+    input[type="range"]::-moz-range-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #0d1522;
+      border: 1px solid #1e2c3f;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 28px;
+      height: 32px;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #2a3d54 0%, #172433 50%, #0d1520 100%);
+      border: 1.5px solid #38bdf8;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.3);
+      cursor: grab;
+    }
+
+    /* Interactive 3-Step Workflow Guidance Banner */
+    .workflow-stepper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      background: rgba(14, 21, 31, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 12px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .step-badge {
+      flex: 1 1 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: all .18s ease;
+      min-height: 44px;
+    }
+    .step-badge:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .step-badge.active {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.16);
+    }
+    .step-badge.completed {
+      border-color: rgba(52, 211, 153, 0.35);
+      background: rgba(52, 211, 153, 0.08);
+    }
+    .step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: .8rem;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: background .18s, color .18s, border-color .18s;
+    }
+    .step-badge.active .step-num {
+      background: var(--accent);
+      color: #041018;
+      border-color: var(--accent);
+    }
+    .step-badge.completed .step-num {
+      background: var(--ok);
+      color: #041018;
+      border-color: var(--ok);
+    }
+    .step-meta {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.25;
+      text-align: left;
+    }
+    .step-title {
+      font-size: .84rem;
+      color: var(--text);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .step-sub {
+      font-size: .7rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .step-arrow {
+      color: var(--border-bright);
+      font-size: .95rem;
+      user-select: none;
+      padding: 0 2px;
+    }
+    @media (max-width: 600px) {
+      .step-sub { display: none; }
+      .step-badge { padding: 4px 8px; gap: 6px; }
+      .step-title { font-size: .76rem; }
+    }
+
+    /* Guidance callout bar */
+    .guidance-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), rgba(15, 23, 34, 0.6));
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 10px;
+      padding: 8px 14px;
+      margin-bottom: 12px;
+      font-size: .82rem;
+      color: #bae6fd;
+      line-height: 1.35;
+    }
+    .guidance-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .guidance-text b {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Contextual Action Pulse (Visual Guidance) */
+    .next-action-pulse {
+      animation: actionPulse 1.6s infinite ease-in-out;
+    }
+    @keyframes actionPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6); }
+      50% { box-shadow: 0 0 0 8px rgba(56, 189, 248, 0); }
+    }
+    body.power-eco .next-action-pulse {
+      animation: none !important;
+      box-shadow: 0 0 0 2px var(--accent) !important;
+    }
+
+    /* Split Studio Deck Architecture */
+    .studio-deck {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    @media (min-width: 860px) {
+      .studio-deck {
+        grid-template-columns: minmax(360px, 420px) 1fr;
+        align-items: start;
+      }
+      .deck-dock {
+        position: sticky;
+        top: max(12px, env(safe-area-inset-top));
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .deck-dock::-webkit-scrollbar { width: 5px; }
+      .deck-dock::-webkit-scrollbar-track { background: transparent; }
+      .deck-dock::-webkit-scrollbar-thumb { background: #233448; border-radius: 999px; }
+    }
+
+    /* Workspace Tabs */
+    .workspace-tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .workspace-tabs::-webkit-scrollbar { height: 4px; }
+    .workspace-tabs::-webkit-scrollbar-thumb { background: #233448; border-radius: 999px; }
+    .workspace-tabs button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 44px;
+      padding: 0.5rem 0.95rem;
+      font-size: .84rem;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .workspace-tabs button:hover {
+      color: var(--text);
+      border-color: #354963;
+    }
+    .workspace-tabs button.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(34, 211, 238, 0.1));
+      border-color: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.2);
+    }
+    .workspace-tabs button .tab-icon {
+      font-size: 1rem;
+    }
+
+    /* Workspace Panels */
+    .workspace-panel {
+      display: none;
+    }
+    .workspace-panel.active {
+      display: block;
+      animation: panelFadeIn .18s ease;
+    }
+    .workspace-panel.all-view {
+      display: block !important;
+      margin-bottom: 14px;
+    }
+    @keyframes panelFadeIn {
+      from { opacity: 0.5; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Preset Quick Category Filter Pills */
+    .cat-filter-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 6px 2px 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cat-filter-bar::-webkit-scrollbar { height: 3px; }
+    .cat-filter-bar::-webkit-scrollbar-thumb { background: #233448; border-radius: 999px; }
+    .cat-filter-btn {
+      min-height: 36px;
+      padding: 0.3rem 0.8rem;
+      font-size: .78rem;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 32, 0.6);
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .cat-filter-btn:hover {
+      color: var(--text);
+      border-color: #3a516b;
+    }
+    .cat-filter-btn.active {
+      background: rgba(56, 189, 248, 0.16);
+      border-color: var(--accent);
+      color: #7dd3fc;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -1366,236 +1681,316 @@
       </div>
     </header>
 
-    <!-- SOURCE -->
-    <section class="card" aria-labelledby="srcTitle">
-      <h2 id="srcTitle">Source</h2>
-      <div class="source-actions">
-        <button type="button" id="btnRecord" class="btn-primary btn-rec" aria-label="Record from microphone">● Record</button>
-        <button type="button" id="btnLiveMonitor" class="btn-monitor" aria-label="Toggle live microphone monitor" aria-pressed="false" title="Hear your transformed voice in real time">🎧 Monitor</button>
-        <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
-        <button type="button" id="btnUndoRecord" class="btn-rec-history" disabled aria-label="Undo recording take" title="Undo recording take (Alt+Z)">↶ Undo Rec</button>
-        <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
-        <button type="button" id="btnDeleteRecord" class="btn-rec-history btn-rec-delete" disabled aria-label="Delete recording take forever" title="Delete recording take forever">🗑 Delete Rec</button>
-        <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,.voxproject,.json,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v,application/json" />
-      </div>
-      <div class="rec-mode-row" role="radiogroup" aria-label="Recording mode">
-        <span class="rec-mode-title">Mode:</span>
-        <label class="rec-mode-opt" title="New recording creates a separate take">
-          <input type="radio" name="recMode" id="recModeStandalone" value="standalone" checked />
-          <span>New clip</span>
-        </label>
-        <label class="rec-mode-opt" title="Append new recording to the current audio with natural crossfade">
-          <input type="radio" name="recMode" id="recModeAppend" value="append" />
-          <span>Append (crossfade)</span>
-        </label>
-      </div>
-      <div id="recHistoryBar" class="rec-history-bar" hidden>
-        <span id="recTakeBadge" class="rec-take-badge" aria-live="polite">Take 1 of 1</span>
-        <span class="rec-take-hint">FIFO buffer · max 10 takes</span>
-      </div>
-      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio, video, or .voxproject files here">
-        <strong>Drop audio, video or .voxproject</strong>
-        <small>WAV · MP3 · AAC · M4A · MP4 · MOV · WebM · .voxproject</small>
-      </div>
-      <div id="meterWrap" class="meter-wrap" aria-hidden="true">
-        <div class="meter" aria-hidden="true"><i id="meterBar"></i></div>
-        <span id="recTimer" class="rec-timer">0:00</span>
-      </div>
-      <div class="gain-panel" aria-label="Recording and input levels">
-        <div class="gain-row">
-          <header>
-            <strong>Mic level</strong>
-            <span id="micLevelVal" class="val">1.0×</span>
-          </header>
-          <input type="range" id="micLevel" min="1" max="12" step="0.1" value="3" aria-label="Microphone recording level" />
-          <p class="hint">Boost applied while recording (and again after stop). Raise this on quiet iPad/iPhone mics.</p>
-        </div>
-        <div class="gain-row">
-          <header>
-            <strong>Input gain</strong>
-            <span id="inputGainVal" class="val">1.0×</span>
-          </header>
-          <input type="range" id="inputGain" min="0.5" max="9" step="0.1" value="1" aria-label="Input gain before FX gain" />
-          <p class="hint">Playback/export make-up gain — always applied <em>before</em> the Advanced Lab “Gain” slider (cascaded: input × FX gain).</p>
-        </div>
-        <div class="row">
-          <button type="button" id="btnMatchLoudness" disabled aria-label="Match clip loudness">Match loudness</button>
+    <!-- INTERACTIVE 3-STEP WORKFLOW GUIDANCE BANNER -->
+    <nav class="workflow-stepper" id="workflowBanner" aria-label="Studio workflow guidance">
+      <div class="step-badge active" id="stepCapture" role="button" tabindex="0" aria-label="Step 1: Capture Voice">
+        <span class="step-num">1</span>
+        <div class="step-meta">
+          <strong class="step-title">1. Capture Voice</strong>
+          <span class="step-sub">Mic Record or File Upload</span>
         </div>
       </div>
-      <details id="cleanupDetails" class="cleanup-details">
-        <summary>Vocal Cleanup (Noise Gate, De-Esser, Hum Filter)</summary>
-        <div class="cleanup-grid">
-          <div class="cleanup-col">
+      <span class="step-arrow" aria-hidden="true">→</span>
+      <div class="step-badge" id="stepTransform" role="button" tabindex="0" aria-label="Step 2: Transform and Sculpt">
+        <span class="step-num">2</span>
+        <div class="step-meta">
+          <strong class="step-title">2. Transform &amp; Sculpt</strong>
+          <span class="step-sub">Presets, XY Morph &amp; Lab</span>
+        </div>
+      </div>
+      <span class="step-arrow" aria-hidden="true">→</span>
+      <div class="step-badge" id="stepExport" role="button" tabindex="0" aria-label="Step 3: Master and Export">
+        <span class="step-num">3</span>
+        <div class="step-meta">
+          <strong class="step-title">3. Master &amp; Export</strong>
+          <span class="step-sub">LUFS Standards &amp; Formats</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- LIVE CONTEXTUAL GUIDANCE BAR -->
+    <div class="guidance-bar" id="guidanceBar" role="status" aria-live="polite">
+      <span class="guidance-icon" aria-hidden="true">💡</span>
+      <span id="workflowHintText" class="guidance-text">Ready to start — tap <b>● Record</b> or drop an audio/video file.</span>
+    </div>
+
+    <!-- SPLIT STUDIO DECK -->
+    <div class="studio-deck">
+      <!-- LEFT DOCK: Sticky Audio & Transport Dock -->
+      <div class="deck-col deck-dock">
+        <!-- SOURCE -->
+        <section class="card card-source" id="cardSource" aria-labelledby="srcTitle">
+          <h2 id="srcTitle">Source</h2>
+          <div class="source-actions">
+            <button type="button" id="btnRecord" class="btn-primary btn-rec" aria-label="Record from microphone">● Record</button>
+            <button type="button" id="btnLiveMonitor" class="btn-monitor" aria-label="Toggle live microphone monitor" aria-pressed="false" title="Hear your transformed voice in real time">🎧 Monitor</button>
+            <button type="button" id="btnUpload" aria-label="Upload audio or video file">Upload</button>
+            <button type="button" id="btnUndoRecord" class="btn-rec-history" disabled aria-label="Undo recording take" title="Undo recording take (Alt+Z)">↶ Undo Rec</button>
+            <button type="button" id="btnRedoRecord" class="btn-rec-history" disabled aria-label="Redo recording take" title="Redo recording take (Alt+Y)">↷ Redo Rec</button>
+            <button type="button" id="btnDeleteRecord" class="btn-rec-history btn-rec-delete" disabled aria-label="Delete recording take forever" title="Delete recording take forever">🗑 Delete Rec</button>
+            <input type="file" id="fileInput" class="sr-only" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.flac,.ogg,.oga,.webm,.caf,.aiff,.aif,.mp4,.m4v,.mov,.3gp,.3g2,.voxproject,.json,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/aac,audio/m4a,audio/x-m4a,audio/mp4,audio/flac,audio/ogg,audio/webm,audio/caf,audio/aiff,video/mp4,video/webm,video/quicktime,video/x-m4v,application/json" />
+          </div>
+          <div class="rec-mode-row" role="radiogroup" aria-label="Recording mode">
+            <span class="rec-mode-title">Mode:</span>
+            <label class="rec-mode-opt" title="New recording creates a separate take">
+              <input type="radio" name="recMode" id="recModeStandalone" value="standalone" checked />
+              <span>New clip</span>
+            </label>
+            <label class="rec-mode-opt" title="Append new recording to the current audio with natural crossfade">
+              <input type="radio" name="recMode" id="recModeAppend" value="append" />
+              <span>Append (crossfade)</span>
+            </label>
+          </div>
+          <div id="recHistoryBar" class="rec-history-bar" hidden>
+            <span id="recTakeBadge" class="rec-take-badge" aria-live="polite">Take 1 of 1</span>
+            <span class="rec-take-hint">FIFO buffer · max 10 takes</span>
+          </div>
+          <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Drop audio, video, or .voxproject files here">
+            <strong>Drop audio, video or .voxproject</strong>
+            <small>WAV · MP3 · AAC · M4A · MP4 · MOV · WebM · .voxproject</small>
+          </div>
+          <div id="meterWrap" class="meter-wrap" aria-hidden="true">
+            <div class="meter" aria-hidden="true"><i id="meterBar"></i></div>
+            <span id="recTimer" class="rec-timer">0:00</span>
+          </div>
+          <div class="gain-panel" aria-label="Recording and input levels">
             <div class="gain-row">
               <header>
-                <strong>Noise Gate</strong>
-                <span id="gateThresholdVal" class="val">Off</span>
+                <strong>Mic level</strong>
+                <span id="micLevelVal" class="val">1.0×</span>
               </header>
-              <input type="range" id="gateThreshold" min="-100" max="-20" step="1" value="-100" aria-label="Noise gate threshold" />
+              <input type="range" id="micLevel" min="1" max="12" step="0.1" value="3" aria-label="Microphone recording level" />
+              <p class="hint">Boost applied while recording. Raise on quiet iPad/iPhone mics.</p>
+            </div>
+            <div class="gain-row">
+              <header>
+                <strong>Input gain</strong>
+                <span id="inputGainVal" class="val">1.0×</span>
+              </header>
+              <input type="range" id="inputGain" min="0.5" max="9" step="0.1" value="1" aria-label="Input gain before FX gain" />
+              <p class="hint">Playback/export make-up gain — cascaded before FX gain.</p>
             </div>
             <div class="row">
-              <button type="button" id="btnAutoCalibrateGate" class="btn-xs" aria-label="Auto-calibrate noise gate threshold from background room noise">Auto-Calibrate Gate</button>
+              <button type="button" id="btnMatchLoudness" disabled aria-label="Match clip loudness">Match loudness</button>
             </div>
           </div>
-          <div class="cleanup-col">
-            <div class="gain-row">
-              <header>
-                <strong>De-Esser (Sibilance)</strong>
-                <span id="deEssAmountVal" class="val">0%</span>
-              </header>
-              <input type="range" id="deEssAmount" min="0" max="1" step="0.01" value="0" aria-label="De-esser reduction strength" />
-            </div>
-            <div class="gain-row" style="margin-top:2px;">
-              <header>
-                <strong>Hum Notch</strong>
-              </header>
-              <select id="humNotchSelect" aria-label="Mains hum notch filter" style="min-height:34px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 8px;font-size:.82rem;">
-                <option value="0" selected>Off (No hum filter)</option>
-                <option value="50">50 Hz Notch (+ 100Hz Harmonic)</option>
-                <option value="60">60 Hz Notch (+ 120Hz Harmonic)</option>
-              </select>
+          <p id="sourceMeta" class="footer-note" style="text-align:left;margin-top:10px;margin-bottom:0"></p>
+        </section>
+
+        <!-- WAVE / TRANSPORT / VISUALIZER -->
+        <section class="card card-wave" id="cardWave" aria-labelledby="waveTitle">
+          <div class="vis-dock-header">
+            <h2 id="waveTitle" style="margin:0;">Visualizer &amp; Preview</h2>
+            <div class="vis-tabs" role="tablist" aria-label="Visualizer Display Mode">
+              <button type="button" id="visTabWave" class="active" role="tab" aria-selected="true">Waveform</button>
+              <button type="button" id="visTabSpectrum" role="tab" aria-selected="false">Spectrum</button>
+              <button type="button" id="visTabSpectrogram" role="tab" aria-selected="false">Spectrogram</button>
             </div>
           </div>
+          <video id="videoPreview" muted playsinline webkit-playsinline preload="metadata"></video>
+          <div class="wave-wrap" id="waveWrap">
+            <canvas id="wave" aria-label="Visualizer display — click or tap to seek in waveform"></canvas>
+            <div id="waveEmpty" class="wave-empty">Pick a voice character, then record or upload</div>
+            <div id="bakeOverlay" class="busy-overlay" role="status"><span><span class="spinner"></span>Applying FX…</span></div>
+          </div>
+          <div class="time-chip" id="timeChip"><b>0:00.00</b> / 0:00.00</div>
+          <div class="wave-tools" role="toolbar" aria-label="Waveform zoom">
+            <button type="button" id="btnZoomOut" disabled aria-label="Zoom out">−</button>
+            <button type="button" id="btnZoomIn" disabled aria-label="Zoom in">+</button>
+            <button type="button" id="btnZoomReset" disabled aria-label="Reset zoom">1×</button>
+            <span id="zoomChip" class="zoom-chip">1×</span>
+          </div>
+          <div class="cue-toolbar" role="toolbar" aria-label="Timeline cue markers">
+            <button type="button" id="btnAddMarker" class="btn-xs" disabled aria-label="Add cue marker at playhead" title="Add cue marker at playhead (Hotkey: M)">+ Marker (M)</button>
+            <button type="button" id="btnClearMarkers" class="btn-xs" disabled aria-label="Clear all cue markers">Clear</button>
+            <div id="cueMarkerList" class="cue-marker-list"></div>
+          </div>
+          <div class="transport" role="toolbar" aria-label="Transport">
+            <span class="skip-desktop">
+              <button type="button" id="btnSkipN10" disabled aria-label="Skip back 10 seconds" title="Shift+←">−10</button>
+            </span>
+            <button type="button" id="btnSkipN5" disabled aria-label="Skip back 5 seconds" title="←">−5</button>
+            <button type="button" id="btnPlay" class="btn-primary" disabled aria-label="Play" title="Space">▶ Play</button>
+            <button type="button" id="btnSkipP5" disabled aria-label="Skip forward 5 seconds" title="→">+5</button>
+            <span class="skip-desktop">
+              <button type="button" id="btnSkipP10" disabled aria-label="Skip forward 10 seconds" title="Shift+→">+10</button>
+            </span>
+            <button type="button" id="btnMoreSkip" class="skip-mobile-extra" disabled aria-label="More skip options" aria-haspopup="true">⋯</button>
+            <span id="frameBtns" class="frame-btns">
+              <button type="button" id="btnFramePrev" disabled aria-label="Previous frame" title=",">◀ Frame</button>
+              <button type="button" id="btnFrameNext" disabled aria-label="Next frame" title=".">Frame ▶</button>
+            </span>
+            <button type="button" id="btnStop" disabled aria-label="Stop">⏹</button>
+            <button type="button" id="btnLoop" disabled aria-label="Loop" aria-pressed="false">Loop</button>
+            <button type="button" id="btnAB" class="btn-ab" disabled aria-label="Compare dry and wet" aria-pressed="false" title="Toggle dry / wet comparison (hear original)">A/B</button>
+            <button type="button" id="btnUndo" disabled aria-label="Undo FX change" title="Ctrl+Z">↶ Undo</button>
+            <button type="button" id="btnRedo" disabled aria-label="Redo FX change" title="Ctrl+Y">↷ Redo</button>
+            <button type="button" id="btnApplyFx" disabled aria-label="Apply FX to clip">Apply FX</button>
+            <button type="button" id="btnResetFx" aria-label="Restore original audio and reset FX to defaults" title="Restore original audio + clear FX">Reset FX</button>
+            <button type="button" id="btnResetAudio" disabled aria-label="Reset recorded or uploaded audio" title="Clear/reset current audio recording or upload">Reset Audio</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- RIGHT DECK: Tabbed FX & Master Workspace -->
+      <div class="deck-col deck-workspace">
+        <!-- WORKSPACE TABS -->
+        <div class="workspace-tabs" id="deckTabs" role="tablist" aria-label="Studio Workspace Tabs">
+          <button type="button" id="tabDeckPresets" class="active" role="tab" aria-selected="true" aria-controls="panelPresets">
+            <span class="tab-icon">🎭</span>
+            <span>Presets &amp; Chain</span>
+          </button>
+          <button type="button" id="tabDeckXy" role="tab" aria-selected="false" aria-controls="panelXyCleanup">
+            <span class="tab-icon">🕹️</span>
+            <span>XY Morph &amp; Clean</span>
+          </button>
+          <button type="button" id="tabDeckLab" role="tab" aria-selected="false" aria-controls="panelLab">
+            <span class="tab-icon">🎚️</span>
+            <span>Advanced Lab</span>
+          </button>
+          <button type="button" id="tabDeckExport" role="tab" aria-selected="false" aria-controls="panelExport">
+            <span class="tab-icon">⬇</span>
+            <span>Master &amp; Export</span>
+          </button>
+          <button type="button" id="tabDeckAll" role="tab" aria-selected="false" aria-controls="panelAll" title="Show all workspace panels simultaneously">
+            <span class="tab-icon">📑</span>
+            <span>All Panels</span>
+          </button>
         </div>
-      </details>
-      <p id="sourceMeta" class="footer-note" style="text-align:left;margin-top:10px;margin-bottom:0"></p>
-    </section>
 
-    <!-- WAVE / TRANSPORT / VISUALIZER -->
-    <section class="card" aria-labelledby="waveTitle">
-      <div class="vis-dock-header">
-        <h2 id="waveTitle" style="margin:0;">Visualizer &amp; Preview</h2>
-        <div class="vis-tabs" role="tablist" aria-label="Visualizer Display Mode">
-          <button type="button" id="visTabWave" class="active" role="tab" aria-selected="true">Waveform</button>
-          <button type="button" id="visTabSpectrum" role="tab" aria-selected="false">Spectrum</button>
-          <button type="button" id="visTabSpectrogram" role="tab" aria-selected="false">Spectrogram</button>
-        </div>
-      </div>
-      <video id="videoPreview" muted playsinline webkit-playsinline preload="metadata"></video>
-      <div class="wave-wrap" id="waveWrap">
-        <canvas id="wave" aria-label="Visualizer display — click or tap to seek in waveform"></canvas>
-        <div id="waveEmpty" class="wave-empty">Pick a voice character, then record or upload</div>
-        <div id="bakeOverlay" class="busy-overlay" role="status"><span><span class="spinner"></span>Applying FX…</span></div>
-      </div>
-      <div class="time-chip" id="timeChip"><b>0:00.00</b> / 0:00.00</div>
-      <div class="wave-tools" role="toolbar" aria-label="Waveform zoom">
-        <button type="button" id="btnZoomOut" disabled aria-label="Zoom out">−</button>
-        <button type="button" id="btnZoomIn" disabled aria-label="Zoom in">+</button>
-        <button type="button" id="btnZoomReset" disabled aria-label="Reset zoom">1×</button>
-        <span id="zoomChip" class="zoom-chip">1×</span>
-      </div>
-      <div class="cue-toolbar" role="toolbar" aria-label="Timeline cue markers">
-        <button type="button" id="btnAddMarker" class="btn-xs" disabled aria-label="Add cue marker at playhead" title="Add cue marker at playhead (Hotkey: M)">+ Marker (M)</button>
-        <button type="button" id="btnClearMarkers" class="btn-xs" disabled aria-label="Clear all cue markers">Clear</button>
-        <div id="cueMarkerList" class="cue-marker-list"></div>
-      </div>
-      <div class="transport" role="toolbar" aria-label="Transport">
-        <span class="skip-desktop">
-          <button type="button" id="btnSkipN10" disabled aria-label="Skip back 10 seconds" title="Shift+←">−10</button>
-        </span>
-        <button type="button" id="btnSkipN5" disabled aria-label="Skip back 5 seconds" title="←">−5</button>
-        <button type="button" id="btnPlay" class="btn-primary" disabled aria-label="Play" title="Space">▶ Play</button>
-        <button type="button" id="btnSkipP5" disabled aria-label="Skip forward 5 seconds" title="→">+5</button>
-        <span class="skip-desktop">
-          <button type="button" id="btnSkipP10" disabled aria-label="Skip forward 10 seconds" title="Shift+→">+10</button>
-        </span>
-        <button type="button" id="btnMoreSkip" class="skip-mobile-extra" disabled aria-label="More skip options" aria-haspopup="true">⋯</button>
-        <span id="frameBtns" class="frame-btns">
-          <button type="button" id="btnFramePrev" disabled aria-label="Previous frame" title=",">◀ Frame</button>
-          <button type="button" id="btnFrameNext" disabled aria-label="Next frame" title=".">Frame ▶</button>
-        </span>
-        <button type="button" id="btnStop" disabled aria-label="Stop">⏹</button>
-        <button type="button" id="btnLoop" disabled aria-label="Loop" aria-pressed="false">Loop</button>
-        <button type="button" id="btnAB" class="btn-ab" disabled aria-label="Compare dry and wet" aria-pressed="false" title="Toggle dry / wet comparison (hear original)">A/B</button>
-        <button type="button" id="btnUndo" disabled aria-label="Undo FX change" title="Ctrl+Z">↶ Undo</button>
-        <button type="button" id="btnRedo" disabled aria-label="Redo FX change" title="Ctrl+Y">↷ Redo</button>
-        <button type="button" id="btnApplyFx" disabled aria-label="Apply FX to clip">Apply FX</button>
-        <button type="button" id="btnResetFx" aria-label="Restore original audio and reset FX to defaults" title="Restore original audio + clear FX">Reset FX</button>
-        <button type="button" id="btnResetAudio" disabled aria-label="Reset recorded or uploaded audio" title="Clear/reset current audio recording or upload">Reset Audio</button>
-      </div>
-    </section>
+        <!-- PRESETS PANEL -->
+        <section class="card workspace-panel active" id="panelPresets" aria-labelledby="presetTitle">
+          <div class="row spread" style="margin-bottom:4px">
+            <h2 id="presetTitle" style="margin:0">Voice presets</h2>
+            <div class="tabs" role="tablist" aria-label="Preset library">
+              <button type="button" id="tabBuiltIn" class="active" role="tab" aria-selected="true">Built-in</button>
+              <button type="button" id="tabCustom" role="tab" aria-selected="false">My settings</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button type="button" id="btnSaveSettings" class="btn-primary" aria-label="Save current FX as custom setting">💾 Save settings</button>
+            <button type="button" id="btnClearChain" class="btn-ghost" aria-label="Clear preset chain">Clear chain</button>
+          </div>
+          <div class="search-row" id="presetSearchRow">
+            <input type="search" id="presetSearch" placeholder="Search presets…" autocomplete="off" aria-label="Search built-in presets" />
+          </div>
+          <div class="cat-filter-bar" id="catFilterBar" role="tablist" aria-label="Preset category filter">
+            <button type="button" class="cat-filter-btn active" data-cat="all">All (64)</button>
+            <button type="button" class="cat-filter-btn" data-cat="Ages">Ages</button>
+            <button type="button" class="cat-filter-btn" data-cat="Characters">Characters</button>
+            <button type="button" class="cat-filter-btn" data-cat="Creatures">Creatures</button>
+            <button type="button" class="cat-filter-btn" data-cat="Devices">Devices</button>
+            <button type="button" class="cat-filter-btn" data-cat="Lo-Fi">Lo-Fi</button>
+            <button type="button" class="cat-filter-btn" data-cat="Spaces">Spaces</button>
+            <button type="button" class="cat-filter-btn" data-cat="FX & Utility">FX &amp; Utility</button>
+          </div>
+          <div id="recentRow" class="recent-row" aria-label="Recent presets"></div>
+          <div id="chainBar" class="chain-bar" aria-live="polite">
+            <strong>Chain</strong>
+            <span id="chainLabel">Tap up to 3 presets in order — they combine into Advanced Lab sliders.</span>
+          </div>
+          <div id="presetGrid" class="preset-groups" role="list"></div>
+          <div id="customEmpty" class="empty-customs" hidden>
+            No saved settings yet. Tweak the FX Lab, then tap <strong>Save settings</strong>.
+          </div>
+        </section>
 
-    <!-- EXPORT & MASTERING -->
-    <section class="card" aria-labelledby="exportTitle">
-      <h2 id="exportTitle">Export &amp; Mastering</h2>
-      <div class="mastering-row">
-        <label for="lufsTargetSelect">Mastering Target</label>
-        <select id="lufsTargetSelect" aria-label="LUFS Loudness Target">
-          <option value="off">Off (Standard Limiter 0.89)</option>
-          <option value="-14" selected>-14 LUFS (Streaming · YouTube / Spotify / Reels)</option>
-          <option value="-16">-16 LUFS (Podcasts · Apple Podcasts / AES TD1004)</option>
-          <option value="-23">-23 LUFS (Broadcast · EBU R128)</option>
-        </select>
-        <span id="lufsMeterReadout" class="lufs-readout" title="Integrated Loudness (ITU-R BS.1770)">--.- LUFS</span>
-      </div>
-      <div class="export-row">
-        <button type="button" id="btnExportPrimary" class="btn-primary" disabled aria-label="Export WAV 16-bit">Export WAV (16-bit)</button>
-        <button type="button" id="btnExportWav24" class="btn-secondary" disabled aria-label="Export Studio WAV 24-bit">Export WAV (24-bit)</button>
-        <button type="button" id="btnExportSecondary" class="btn-secondary" disabled aria-label="Export MP3">Export MP3</button>
-        <button type="button" id="btnExportOpus" class="btn-secondary" disabled aria-label="Export OGG/Opus">Export Opus</button>
-        <button type="button" id="btnBatchExport" class="btn-primary" disabled aria-label="Batch Export across multiple presets" title="Batch render clip across multiple presets in one go">⚡ Batch Presets</button>
-        <button type="button" id="btnSaveProject" class="btn-primary" aria-label="Save project" title="Save full project settings &amp; audio buffer (Ctrl+S)">💾 Save Project</button>
-        <button type="button" id="btnRestoreProject" class="btn-secondary" aria-label="Restore project" title="Restore project from file or browser library (Ctrl+O)">📂 Restore Project</button>
-        <button type="button" id="btnShare" hidden disabled aria-label="Share export">Share</button>
-        <button type="button" id="btnResetProject" class="btn-danger" aria-label="Reset project">Reset Project</button>
-      </div>
-    </section>
+        <!-- 2D MACRO XY MORPH PAD & VOCAL CLEANUP PANEL -->
+        <section class="card workspace-panel" id="panelXyCleanup" aria-labelledby="xyPadTitle">
+          <div class="row spread" style="margin-bottom:6px;">
+            <h2 id="xyPadTitle" style="margin:0;">Macro XY Morph Pad</h2>
+            <select id="xyAxisMode" aria-label="XY Pad Axis Preset" style="min-height:34px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 8px;font-size:.82rem;">
+              <option value="pitch-formant" selected>Pitch (X) × Formant (Y)</option>
+              <option value="space-grit">Space Reverb (X) × Drive Grit (Y)</option>
+              <option value="robot-mod">Robot RingMod (X) × Chorus Mod (Y)</option>
+              <option value="vocal-polish">Noise Gate (X) × Input Gain (Y)</option>
+            </select>
+          </div>
+          <div class="xy-pad-wrap" id="xyPadWrap">
+            <canvas id="xyPadCanvas" width="400" height="200" aria-label="2D interactive Macro XY morph pad — drag to morph parameters"></canvas>
+            <div class="xy-pad-labels">
+              <span id="xyLabelX" class="xy-axis-label x">Pitch: 0.0st</span>
+              <span id="xyLabelY" class="xy-axis-label y">Formant: 0.0st</span>
+            </div>
+          </div>
 
-    <!-- PRESETS -->
-    <section class="card" aria-labelledby="presetTitle">
-      <div class="row spread" style="margin-bottom:4px">
-        <h2 id="presetTitle" style="margin:0">Voice presets</h2>
-        <div class="tabs" role="tablist" aria-label="Preset library">
-          <button type="button" id="tabBuiltIn" class="active" role="tab" aria-selected="true">Built-in</button>
-          <button type="button" id="tabCustom" role="tab" aria-selected="false">My settings</button>
-        </div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button type="button" id="btnSaveSettings" class="btn-primary" aria-label="Save current FX as custom setting">💾 Save settings</button>
-        <button type="button" id="btnClearChain" class="btn-ghost" aria-label="Clear preset chain">Clear chain</button>
-      </div>
-      <div class="search-row" id="presetSearchRow">
-        <input type="search" id="presetSearch" placeholder="Search presets…" autocomplete="off" aria-label="Search built-in presets" />
-      </div>
-      <div id="recentRow" class="recent-row" aria-label="Recent presets"></div>
-      <div id="chainBar" class="chain-bar" aria-live="polite">
-        <strong>Chain</strong>
-        <span id="chainLabel">Tap up to 3 presets in order — they combine into Advanced Lab sliders.</span>
-      </div>
-      <div id="presetGrid" class="preset-groups" role="list"></div>
-      <div id="customEmpty" class="empty-customs" hidden>
-        No saved settings yet. Tweak the FX Lab, then tap <strong>Save settings</strong>.
-      </div>
-    </section>
+          <!-- VOCAL CLEANUP STRIP (NOISE GATE, DE-ESSER, HUM FILTER) -->
+          <div style="margin-top:14px;">
+            <details id="cleanupDetails" class="cleanup-details" open>
+              <summary>Pre-FX Vocal Cleanup (Noise Gate, De-Esser, Hum Filter)</summary>
+              <div class="cleanup-grid">
+                <div class="cleanup-col">
+                  <div class="gain-row">
+                    <header>
+                      <strong>Noise Gate</strong>
+                      <span id="gateThresholdVal" class="val">Off</span>
+                    </header>
+                    <input type="range" id="gateThreshold" min="-100" max="-20" step="1" value="-100" aria-label="Noise gate threshold" />
+                  </div>
+                  <div class="row">
+                    <button type="button" id="btnAutoCalibrateGate" class="btn-xs" aria-label="Auto-calibrate noise gate threshold from background room noise">Auto-Calibrate Gate</button>
+                  </div>
+                </div>
+                <div class="cleanup-col">
+                  <div class="gain-row">
+                    <header>
+                      <strong>De-Esser (Sibilance)</strong>
+                      <span id="deEssAmountVal" class="val">0%</span>
+                    </header>
+                    <input type="range" id="deEssAmount" min="0" max="1" step="0.01" value="0" aria-label="De-esser reduction strength" />
+                  </div>
+                  <div class="gain-row" style="margin-top:2px;">
+                    <header>
+                      <strong>Hum Notch</strong>
+                    </header>
+                    <select id="humNotchSelect" aria-label="Mains hum notch filter" style="min-height:34px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 8px;font-size:.82rem;">
+                      <option value="0" selected>Off (No hum filter)</option>
+                      <option value="50">50 Hz Notch (+ 100Hz Harmonic)</option>
+                      <option value="60">60 Hz Notch (+ 120Hz Harmonic)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
 
-    <!-- 2D MACRO XY MORPH PAD -->
-    <section class="card" aria-labelledby="xyPadTitle">
-      <div class="row spread" style="margin-bottom:6px;">
-        <h2 id="xyPadTitle" style="margin:0;">Macro XY Morph Pad</h2>
-        <select id="xyAxisMode" aria-label="XY Pad Axis Preset" style="min-height:34px;border-radius:8px;background:var(--bg);border:1px solid var(--border);padding:0 8px;font-size:.82rem;">
-          <option value="pitch-formant" selected>Pitch (X) × Formant (Y)</option>
-          <option value="space-grit">Space Reverb (X) × Drive Grit (Y)</option>
-          <option value="robot-mod">Robot RingMod (X) × Chorus Mod (Y)</option>
-          <option value="vocal-polish">Noise Gate (X) × Input Gain (Y)</option>
-        </select>
-      </div>
-      <div class="xy-pad-wrap" id="xyPadWrap">
-        <canvas id="xyPadCanvas" width="400" height="180" aria-label="2D interactive Macro XY morph pad — drag to morph parameters"></canvas>
-        <div class="xy-pad-labels">
-          <span id="xyLabelX" class="xy-axis-label x">Pitch: 0.0st</span>
-          <span id="xyLabelY" class="xy-axis-label y">Formant: 0.0st</span>
-        </div>
-      </div>
-    </section>
+        <!-- ADVANCED LAB PANEL -->
+        <section class="card workspace-panel" id="panelLab" aria-labelledby="labTitle">
+          <h2 id="labTitle">Advanced Lab</h2>
+          <details id="labDetails" class="lab" open>
+            <summary>Show FX parameters (38 Pro Faders)</summary>
+            <div id="fxPanel"></div>
+          </details>
+        </section>
 
-    <!-- ADVANCED LAB -->
-    <section class="card" aria-labelledby="labTitle">
-      <h2 id="labTitle">Advanced Lab</h2>
-      <details id="labDetails" class="lab">
-        <summary>Show FX parameters</summary>
-        <div id="fxPanel"></div>
-      </details>
-    </section>
+        <!-- EXPORT & MASTERING PANEL -->
+        <section class="card workspace-panel" id="panelExport" aria-labelledby="exportTitle">
+          <h2 id="exportTitle">Export &amp; Mastering</h2>
+          <div class="mastering-row">
+            <label for="lufsTargetSelect">Mastering Target</label>
+            <select id="lufsTargetSelect" aria-label="LUFS Loudness Target">
+              <option value="off">Off (Standard Limiter 0.89)</option>
+              <option value="-14" selected>-14 LUFS (Streaming · YouTube / Spotify / Reels)</option>
+              <option value="-16">-16 LUFS (Podcasts · Apple Podcasts / AES TD1004)</option>
+              <option value="-23">-23 LUFS (Broadcast · EBU R128)</option>
+            </select>
+            <span id="lufsMeterReadout" class="lufs-readout" title="Integrated Loudness (ITU-R BS.1770)">--.- LUFS</span>
+          </div>
+          <div class="export-row">
+            <button type="button" id="btnExportPrimary" class="btn-primary" disabled aria-label="Export WAV 16-bit">Export WAV (16-bit)</button>
+            <button type="button" id="btnExportWav24" class="btn-secondary" disabled aria-label="Export Studio WAV 24-bit">Export WAV (24-bit)</button>
+            <button type="button" id="btnExportSecondary" class="btn-secondary" disabled aria-label="Export MP3">Export MP3</button>
+            <button type="button" id="btnExportOpus" class="btn-secondary" disabled aria-label="Export OGG/Opus">Export Opus</button>
+            <button type="button" id="btnBatchExport" class="btn-primary" disabled aria-label="Batch Export across multiple presets" title="Batch render clip across multiple presets in one go">⚡ Batch Presets</button>
+            <button type="button" id="btnSaveProject" class="btn-primary" aria-label="Save project" title="Save full project settings &amp; audio buffer (Ctrl+S)">💾 Save Project</button>
+            <button type="button" id="btnRestoreProject" class="btn-secondary" aria-label="Restore project" title="Restore project from file or browser library (Ctrl+O)">📂 Restore Project</button>
+            <button type="button" id="btnShare" hidden disabled aria-label="Share export">Share</button>
+            <button type="button" id="btnResetProject" class="btn-danger" aria-label="Reset project">Reset Project</button>
+          </div>
+        </section>
+      </div>
+    </div>
 
     <footer class="app-footer" style="margin-top:20px;text-align:center;">
       <p class="footer-note" style="margin:0;">🔒 All processing stays on your device. Audio is never uploaded.</p>
