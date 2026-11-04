@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for adding Procedural Demo Voice Samples (instant zero-bloat voice testing) and a Background Ambience & Foley Soundscape Mixer with a dedicated Ambience & FX Extras sub-panel in VoxClip Studio.",
-  "updatedAt": "2026-11-03T02:57:22.974634700Z",
+  "summary": "Implementation plan for adding a full-featured Audio Cut, Trim & Region Selection suite to VoxClip Studio, including interactive waveform In/Out drag handles, playhead In/Out controls, numeric time inputs, Trim (keep selection), Cut (delete selection with micro-crossfade), Auto-Trim Silence, region audition/looping, cue marker snapping, and full Undo/Redo history integration.",
+  "updatedAt": "2026-11-04T05:51:08.813982397Z",
   "requestFeedback": true,
   "userFacing": true
 }

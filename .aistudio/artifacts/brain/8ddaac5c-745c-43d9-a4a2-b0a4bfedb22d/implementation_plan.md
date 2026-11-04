@@ -1,71 +1,73 @@
-# VoxClip Studio — Procedural Demo Voice Samples & Soundscape Ambience Mixer
+# VoxClip Studio — Audio Cut, Trim & Region Selection Suite
 
-This plan enhances VoxClip Studio with **Built-in Procedural Demo Voice Samples** for instant one-tap voice auditioning without a microphone, alongside a **Background Ambience & Foley Soundscape Mixer** housed in a dedicated **Ambience & FX Extras** sub-panel—all powered by zero-bloat procedural Web Audio DSP synthesis.
+This plan introduces a studio-grade **Audio Cut, Trim & Region Selection Suite** directly into VoxClip Studio's Waveform & Transport dock, enabling non-destructive region auditioning, tactile In/Out drag handles on the waveform, click-free **Trim (Keep Selection)**, **Cut (Delete Selection)**, and **Auto-Trim Silence**—all integrated with the existing Undo/Redo buffer history.
 
 ## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> The following product and architectural decisions reflect your confirmed choices:
+> Review the recommended design and workflow decisions below. Click **Proceed** to build or let me know if you'd like any adjustments:
 
-- **Confirmed Decision 1 — Built-in Demo Voice Samples (`Instant Zero-Mic Testing`)**: Adds a one-tap **Demo Voice Selector** in the Source Capture bay featuring procedurally synthesized formant speech/vocal phrases (*Male Baritone Narrative*, *Female Alto Vocal*, *Expressive Storyteller*, *Whisper / Intimate Cadence*, and *Sci-Fi Comms Phrase*) so users can audition all 64+ presets, 3-slot chains, and XY morphing immediately.
-- **Confirmed Decision 2 — Background Ambience & Foley Soundscape Mixer (`Immersive Scene Layering`)**: Adds a procedural soundscape generator with 8 curated environments (*Off*, *Vinyl & Tape Crackle*, *Rain & Distant Thunder*, *Starship Bridge Hum*, *Vintage Radio Static*, *Dungeon Cavern Wind*, *Cyberpunk Neon Rain*, and *Campfire Crackles*), complete with **Ambience Mix Level**, **Tone / Brightness**, and **Voice Auto-Ducking** (automatically dips the background soundscape when the voice speaks).
-- **Confirmed Decision 3 — Procedural Formant & Soundscape Synthesis (`Zero Repo Bloat`)**: Generates both the realistic multi-syllable formant vocal phrases (glottal Rosenberg/LF pulse train + cascaded vocal tract formant resonators F1/F2/F3 + consonant bursts + natural pitch prosody) and the continuous atmospheric soundscapes purely in the client-side DSP engine (`VoxFx`), keeping the repository lightweight and 100% offline.
-- **Confirmed Decision 4 — Dedicated Ambience & FX Extras Sub-Panel (`Split Studio Deck`)**: Integrates a dedicated **Ambience & FX Extras** sub-panel inside the Right Workspace Deck (`XY Morph & Clean` view and `All Panels` rack) and synchronizes the ambience parameters (`ambiencePreset`, `ambienceMix`, `ambienceDuck`, `ambienceTone`) across live playback, offline `Apply FX` baking, WAV/MP3/Opus export, custom presets, `.voxproject` files, and undo/redo history.
+- **Recommended Decision 1 — Complete Editing Suite (`Trim`, `Cut`, and `Trim Silence`)**:
+  - **Trim (Keep Selection)**: Crops the audio clip to the selected `[In, Out]` region and discards outside audio.
+  - **Cut (Delete Selection)**: Removes the selected `[In, Out]` region and seamlessly joins the surrounding audio segments together.
+  - **Trim Silence**: Automatically detects and strips leading and trailing dead air/silence below `-45 dB` while preserving natural speech attack and release tails.
+- **Recommended Decision 2 — Multi-Modal Region Selection (`Waveform Handles + Playhead Buttons + Time Inputs`)**:
+  - **On-Canvas Drag Handles**: Drag directly on the waveform or grab the dedicated **In (`[`)** and **Out (`]`)** bracket handles ($44\text{px}$ touch hitboxes on iPad/mobile) to adjust selection boundaries visually.
+  - **Playhead & Precision Controls**: Dedicated **`[ Set In`** and **`] Set Out`** buttons (and keyboard shortcuts `[` / `]`), numeric start/end time inputs (`tabular-nums`), and a **`Clear Selection`** action.
+- **Recommended Decision 3 — Click-Free Zero-Crossing & Micro-Crossfade Splicing**:
+  - Every **Trim** and **Cut** operation snaps to the nearest zero-crossing (within a `2 ms` window) and applies a `5 ms` equal-power micro-fade/crossfade at the edit boundary so edits never produce audible pops or clicks.
+- **Recommended Decision 4 — Region Auditioning, Cue Snapping & Full Undo/Redo Integration**:
+  - When a region is active, **Play** and **Loop** can audition the selected range, dragging handles near existing Cue Markers gently snaps to them, and every Trim/Cut/Silence operation pushes a full audio snapshot onto the **Undo / Redo** stack (`Ctrl+Z` / `Ctrl+Y`).
 
 ---
 
 ## 1. Overview & Core Concept
 
-- **What It Does**: Eliminates the "cold start" friction of needing to record a microphone take or hunt for an audio file before testing voice transformations, and lets creators place their transformed voice inside a rich atmospheric environment with automatic voice ducking.
-- **Target Audience / Persona**: Content creators, streamers, game masters, podcasters, and sound designers on iPad, desktop, and mobile who want to audition voice characters in one tap and export broadcast-ready voice + atmosphere clips in a single pass.
-- **Key Value**: Turns VoxClip Studio from a standalone voice processor into a self-contained voice & scene design workstation where anyone can launch the app, tap a demo voice, blend a preset chain with a reactive background soundscape, and export immediately.
+- **What It Does**: Empowers users to clean up recordings and uploaded clips directly inside the waveform dock—trimming out count-in delays, cutting out stumbles or coughs mid-sentence, or automatically stripping leading/trailing room silence before applying FX or exporting.
+- **Target Audience / Persona**: Voice actors, podcasters, streamers, and mobile/iPad creators who need fast, sample-accurate audio editing without leaving VoxClip Studio for an external DAW.
+- **Key Value**: Combines visual waveform region editing, tactile touch handles, and click-free DSP splicing with VoxClip Studio's real-time voice transformation pipeline.
 
 ---
 
 ## 2. User Experience & Visual Design
 
 - **Key User Flows**:
-  1. **Zero-Mic Instant Auditioning (`Step 1 → Step 2 in One Tap`)**:
-     - Inside the Left Dock's **Source** card, directly below the primary `Record` / `Monitor` / `Upload` row, a compact **Try Demo Voice** bar lets users pick a procedural vocal archetype (*Baritone Phrase*, *Alto Phrase*, *Storyteller*, *Whisper Cadence*, *Sci-Fi Comms*) and tap **Load Demo** (or select directly).
-     - If a recording or uploaded clip is already loaded, replacing it follows the studio's standard confirmation safeguard (`studioConfirm`).
-     - Upon loading, the synthesized mono vocal phrase populates the waveform visualizer, advances the 3-Step Workflow Banner to **Step 2 (`2. Transform & Sculpt`)**, and is immediately ready for playback and FX processing.
-  2. **Layering Background Ambience (`Ambience & FX Extras Sub-Panel`)**:
-     - Inside the Right Workspace Deck (under `XY Morph & Clean` and visible in `All Panels`), a new **Ambience & Soundscape Mixer** sub-panel sits alongside the Pre-FX Vocal Cleanup strip.
-     - Users can tap any of the tactile soundscape scene pills or dropdown options (*Vinyl Crackle*, *Rain & Thunder*, *Starship Hum*, *Radio Static*, *Dungeon Wind*, *Cyberpunk Rain*, *Campfire*) and adjust three oversized $44\text{px}$ touch faders:
-       - **Ambience Mix (`0%`–`80%`)**: Controls the level of the procedural soundscape bed relative to the voice.
-       - **Voice Auto-Duck (`0%`–`100%`)**: Envelope-follows the vocal signal so the background soundscape ducks smoothly underneath active speech and swells back during pauses.
-       - **Ambience Tone (`Dark` to `Bright`)**: Shapes the spectral tilt of the ambience bed so it never masks vocal intelligibility.
-  3. **Auditioning, Baking & Exporting (`WYSIWYE`)**:
-     - Pressing **▶ Play** renders both the transformed voice and the ducked background soundscape in real time; toggling **A/B** compares the dry original voice against the full wet voice + soundscape mix.
-     - Clicking **Apply FX** or exporting (**WAV 16/24-bit**, **MP3**, **Opus**, **Batch Presets**) renders the exact voice + ducked ambience mix through the LUFS mastering stage.
+  1. **Selecting a Region on the Waveform**:
+     - Users can **Shift+Drag** (or toggle the **Select Region** tool for one-finger touch dragging on iPad/mobile) across the waveform canvas, or tap **`[ In`** and **`] Out`** while playing or paused to bracket a section.
+     - The selected region highlights on the waveform canvas with a translucent Studio Cyan overlay (`rgba(56, 189, 248, 0.18)`), dimmed outside regions when previewing, and high-contrast vertical In/Out boundary bars with grab tabs at the top/bottom edges.
+     - Dragging an In/Out handle near a Timeline Cue Marker (`#1`, `#2`, etc.) snaps cleanly to the marker timestamp.
+  2. **Auditioning & Fine-Tuning the Selection**:
+     - The **Cut & Trim Toolbar** displays the exact **`In`**, **`Out`**, and **`Selected Duration`** in `JetBrains Mono` (`tabular-nums`), with editable start/end inputs for `0.01s` precision.
+     - Tapping **▶ Play Selection** (or standard Play when a selection is active) plays from `In` to `Out` (and loops between `In` and `Out` when **Loop** is enabled).
+  3. **Executing Trim, Cut, or Silence Strip**:
+     - Tapping **✂ Trim (Keep)** crops the buffer to `[In, Out]`, updates cue markers relative to the new start offset, rebuilds the FX preview and LUFS readout, and clears the selection.
+     - Tapping **🗑 Cut (Remove)** excises `[In, Out]`, applies a `5 ms` micro-crossfade across the splice point, shifts downstream cue markers earlier by the removed duration, and updates the waveform.
+     - Tapping **✨ Trim Silence** scans the clip from both ends, trims dead air below threshold with a smooth `15 ms` fade-in/out pad, and reports how much silence was removed via toast notification.
+     - If the user wants to revert any edit, tapping **↶ Undo** (`Ctrl+Z`) immediately restores the pre-edit audio buffer, selection, and cue markers.
 
 - **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Retains and extends the **Pro Hardware Console** dark slate aesthetic (`#080d14` chassis, `#121821` cards, `#202d40` `1px` structural hairlines).
+  - *Aesthetic Direction*: Matches VoxClip Studio's **Pro Hardware Console** dark slate design (`--bg: #080d14`, `--bg2: #0f1622`, `--bg3: #162030`, `--border: #202d40`).
   - *Color Palette & Mood*:
-    - **60% Dominant Canvas**: Deep studio slate (`--bg: #080d14`, `--bg2: #0f1622`).
-    - **30% Structural Surfaces**: Recessed bay controls (`--bg3: #162030`) and muted steel labels (`--muted: #8b9bb0`).
-    - **10% Semantic Accents**: Studio Cyan (`#38bdf8`) for active demo voice & soundscape selection, Nominal Emerald (`#34d399`) for active ducking/LUFS indicators, and Warm Amber (`#fbbf24`) for A/B dry comparison.
-  - *Typography & Hierarchy*:
-    - UI labels in `Plus Jakarta Sans` with strict single-line button discipline (`whitespace-nowrap`).
-    - Numeric readouts (`%`, `dB`, `Hz`, duration) in `JetBrains Mono` with `font-variant-numeric: tabular-nums`.
-    - Zero static pill clutter: source sample metadata and ducking status render as clean inline text with `·` separators.
+    - **Active Region Fill**: Translucent cyan (`rgba(56, 189, 248, 0.18)`) bounded by `#22d3ee` `2px` vertical markers and tactile handle caps.
+    - **Unselected Dimming**: Subtle dark scrim (`rgba(4, 10, 18, 0.45)`) outside the `[In, Out]` range so the kept/targeted audio stands out immediately.
+    - **Destructive vs. Constructive Actions**: **Trim (Keep)** uses Studio Cyan accent styling; **Cut (Delete)** uses subtle Rose danger tinting (`--danger: #f43f5e`).
+  - *Typography & Layout*:
+    - Single-line button labels (`whitespace-nowrap`) with $\ge 44\text{px}$ touch hitboxes for iPad/mobile ergonomics.
+    - Unboxed tabular numeral readouts (`0:01.24 – 0:04.80 · 3.56s selected`) using `JetBrains Mono`.
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Decision 1: Formant-Synthesized Vocal Phrases vs. Static Audio Files**
-  - *Chosen Approach*: Build `synthesizeDemoVoice(presetId, sampleRate)` inside `VoxFx` (`js/fx-engine.js`) using a glottal pulse generator (fundamental pitch contour $F_0$ with natural vibrato and intonation cadence), time-varying formant resonator banks ($F_1, F_2, F_3$ modeling vowel-to-vowel transitions and voiced/unvoiced plosive/fricative articulation), and syllable envelope shaping.
-  - *Why*: Produces rich, harmonic, speech-like vocal phrases (~3.5–4.5 seconds) with realistic formants, sibilance, and pitch contours that exercise pitch shifting, formant scaling, vocoding, de-essing, and reverb realistically—with **0 KB of external asset downloads** and instant synchronous generation offline.
-  - *Alternatives Considered*: Bundling multiple uncompressed WAV/MP3 files increases repository size and service-worker cache footprint; Web Speech API `speechSynthesis` cannot be captured into an `AudioBuffer` across browsers due to OS sandboxing.
-
-- **Decision 2: Envelope-Ducked Procedural Soundscape Engine**
-  - *Chosen Approach*: Implement `applyAmbienceSoundscape(buf, fx)` in `VoxFx` and integrate a real-time/offline ambience generator with sidechain-style vocal envelope ducking.
-  - *Why*: Without auto-ducking, background ambiences like rain or radio static can muddy quiet consonants. Tracking the vocal envelope and ducking the ambience by `ambienceDuck` ensures broadcast-grade clarity while letting the atmosphere breathe between spoken phrases.
-
-- **Decision 3: Full State & Persistence Integration**
-  - *Chosen Approach*: Add `ambiencePreset` (`'none'`), `ambienceMix` (`0`), `ambienceDuck` (`0.5`), and `ambienceTone` (`0`) to `DEFAULT_FX_VALUES` and `FX_META`.
-  - *Why*: Because they live in the standard `S.fx` parameter schema, they automatically work with the 50-step Undo/Redo stack, Custom Settings library, `.voxproject` files, IndexedDB browser projects, and `localStorage` persistence without breaking existing schemas or unit tests.
+- **Decision 1: Dual Pointer Interaction (Seek vs. Region Drag)**
+  - *Chosen Approach*: Provide a dedicated **Selection Mode toggle (`⌸ Select` / `Pointer`)** alongside direct handle dragging and **`[ In` / `] Out`** buttons, plus `Shift + Drag` on desktop. Whenever a selection exists, grabbing within `18px` (or `24px` on touch) of the In or Out boundary line directly drags that handle without needing to switch modes.
+  - *Why*: Preserves instant single-tap waveform seeking while making region creation effortless on both desktop mice and iPad/mobile touchscreens.
+- **Decision 2: Zero-Crossing Snap + Equal-Power Micro-Crossfade**
+  - *Chosen Approach*: Implement `trimAudioBuffer(buf, startSec, endSec)` and `cutAudioBufferRegion(buf, startSec, endSec)` inside the DSP engine (`VoxFx`) with automatic zero-crossing search ($\pm 2\text{ms}$) and a `5 ms` cosine micro-fade/crossfade.
+  - *Why*: Raw sample-index slicing on speech waveforms almost always cuts mid-wavecycle, causing a sharp transient click that gets amplified by downstream distortion, compression, or vocoding.
+- **Decision 3: Cue Marker & Undo History Synchronization**
+  - *Chosen Approach*: Snapshot both `S.buffer` (`includeBuffer: true`) and `S.cueMarkers` / `S.selection` in `pushHistory()`, and automatically shift or prune cue markers when audio is trimmed or cut.
+  - *Why*: Ensures timeline markers stay aligned with the actual spoken words after an edit and come back intact on Undo.
 
 ---
 
@@ -74,56 +76,54 @@ This plan enhances VoxClip Studio with **Built-in Procedural Demo Voice Samples*
 - **Architecture & Signal Flow Diagram**:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│ LEFT DOCK: SOURCE CAPTURE BAY                                                       │
-│ ┌───────────────────────────────┐     ┌───────────────────────────────────────────┐ │
-│ │ ● Record  🎧 Monitor ⬆ Upload │     │ 🗣️ Try Demo Voice: [Baritone Narrative ▾] │ │
-│ └──────────────┬────────────────┘     └─────────────────────┬─────────────────────┘ │
-│                │                                            │                       │
-│                ▼                                            ▼                       │
-│        Mic / File Decode                     VoxFx.synthesizeDemoVoice(type)        │
-│                └────────────────────┬───────────────────────┘                       │
-│                                     ▼                                               │
-│                       Mono Project AudioBuffer (S.buffer)                           │
-└─────────────────────────────────────┬───────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────────────┐
-│ VOXFX DSP & SOUNDSCAPE PIPELINE (Live Preview · Apply FX Bake · Final Export)       │
-│                                                                                     │
-│  [1. Pre-FX Vocal Cleanup] ──► Hum Notch (50/60Hz) → Noise Gate → De-Esser          │
-│              │                                                                      │
-│              ▼                                                                      │
-│  [2. Pitch & Synthesis]    ──► Phase-Vocoder Pitch/Cents → Harmonizer → Vocoder     │
-│              │                                                                      │
-│              ▼                                                                      │
-│  [3. Core WebAudio Chain]  ──► Formant EQ → Filter/Drive/Ring → Chorus/Delay/Reverb │
-│              │                                                                      │
-│              ▼                                                                      │
-│  [4. Ambience & Soundscape]──► Procedural Generator (Rain / Vinyl / Sci-Fi / Wind)  │
-│              │                 × Tone Filter × Vocal Sidechain Auto-Ducker          │
-│              ▼                                                                      │
-│  [5. Master & Export]      ──► Peak Limiter (0.89) & ITU-R BS.1770 LUFS Normalizer  │
-└─────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│ WAVEFORM & TRANSPORT DOCK                                                         │
+│                                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Waveform Canvas (#wave)                                                     │  │
+│  │  ░░░░░░░░░┃◄─── Selected Region [In .. Out] ───►┃░░░░░░░░░░░░░░░░░░░░░░░░░  │  │
+│  │           ▲ Drag Handle (In)                    ▲ Drag Handle (Out)         │  │
+│  └───────────┴─────────────────────────────────────┴───────────────────────────┘  │
+│                                                                                   │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Cut & Trim Toolbar (#trimToolbar)                                           │  │
+│  │  [⌸ Select]  [ In ]  [ Out ]   In: 0:01.20  Out: 0:03.85  (2.65s)           │  │
+│  │  [▶ Play Sel]  [✂ Trim (Keep)]  [🗑 Cut (Delete)]  [✨ Trim Silence]  [×]   │  │
+│  └──────────────────────┬───────────────────┬──────────────────┬───────────────┘  │
+└─────────────────────────┼───────────────────┼──────────────────┼──────────────────┘
+                          │                   │                  │
+                          ▼                   ▼                  ▼
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│ VOXFX BUFFER EDITING ENGINE (Client-Side DSP)                                     │
+│                                                                                   │
+│  1. pushHistory({ includeBuffer: true }) ──► Saves AudioBuffer + Cue Markers      │
+│  2. Zero-Crossing Search (±2ms)          ──► Finds click-free sample boundaries   │
+│  3. Buffer Operation:                                                             │
+│     • trimBuffer(buf, inSec, outSec)     ──► Extracts [In..Out] + 5ms edge fades  │
+│     • cutBufferRegion(buf, inSec, outSec)──► Splices [0..In] + [Out..End] w/ XFade│
+│     • trimSilence(buf, threshDb, padSec) ──► Strips leading/trailing dead air     │
+│  4. Rebuild Peak Pyramid & FX Preview    ──► Updates Waveform, Cue Markers & LUFS │
+└───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Data Model & State Extensions**:
-  - **Demo Voice Presets (`DEMO_VOICE_SAMPLES`)**:
-    - `'baritone'`: *Male Baritone Narrative* ($F_0 \approx 115\text{ Hz}$, warm chest formants, 4-phrase cadence, ~3.8s)
-    - `'alto'`: *Female Alto Vocal* ($F_0 \approx 210\text{ Hz}$, bright resonant formants, melodic inflection, ~3.8s)
-    - `'storyteller'`: *Expressive Storyteller* ($F_0 \approx 145\text{ Hz}$, dynamic pitch prosody + crisp sibilants for testing De-Esser/Gate, ~4.2s)
-    - `'whisper'`: *Breathy Whisper Cadence* (aspirated formant noise + soft voicing for testing ASMR/Ghost/Clean Boost, ~3.5s)
-    - `'scifi'`: *Sci-Fi Comms Check* ($F_0 \approx 130\text{ Hz}$, rhythmic staccato syllables ideal for Robot/Vocoder/Radio presets, ~3.6s)
-  - **Ambience Soundscape Parameters in `DEFAULT_FX_VALUES`**:
-    - `ambiencePreset`: `'none' | 'vinyl' | 'rain' | 'starship' | 'static' | 'dungeon' | 'cyberpunk' | 'campfire'` (default `'none'`)
-    - `ambienceMix`: `0` to `0.8` (default `0`, step `0.01`)
-    - `ambienceDuck`: `0` to `1` (default `0.55`, step `0.01` — amount of vocal-triggered sidechain ducking)
-    - `ambienceTone`: `-6` to `+6` dB (default `0`, step `0.5` — lowpass/highshelf spectral tilt on the ambience bed)
+  - **Selection State in `S`**:
+    - `selection`: `{ active: false, start: 0, end: 0 }` (in seconds, clamped to `[0, S.buffer.duration]`, where `start < end` and minimum span is `0.05s`).
+    - `waveTool`: `'seek' | 'select'` (controls whether dragging on empty waveform seeks or draws a new selection range; dragging on existing In/Out handles always resizes the selection).
+    - `draggingHandle`: `null | 'in' | 'out' | 'region' | 'new'` (tracks active pointer interaction on `#wave`).
+  - **History Snapshot Extensions**:
+    - Extend `snapshotHistory()` and `applyHistory()` to preserve `cueMarkers` and `selection` alongside `buffer` so undoing a Trim or Cut restores both the exact audio and any timeline markers.
 
 - **Interactive Component & State Mapping**:
-  - **Demo Voice Bar (`#demoVoiceSelect`, `#btnLoadDemoVoice`)**:
-    - Selecting a demo voice and tapping **Load Demo** synthesizes the mono `AudioBuffer` via `fxApi.synthesizeDemoVoice(voiceId)`, checks replace confirmation if a user clip is active, calls `setBuffer(buf, { name: 'Demo: ' + label, clearVideo: true })`, and shows a confirmation toast.
-  - **Ambience & FX Extras Sub-Panel (`#ambienceDetails` inside `#panelXyCleanup` + synced in `#fxPanel`)**:
-    - Scene selector buttons/dropdown (`#ambiencePresetSelect` and quick scene buttons) set `S.fx.ambiencePreset` (and automatically set `S.fx.ambienceMix = 0.25` when switching from `'none'` to an active scene so the user immediately hears the soundscape).
-    - Sliders for `#ambienceMix`, `#ambienceDuck`, and `#ambienceTone` update `S.fx` in real time, sync with the Advanced Lab group, push to the Undo/Redo history stack on gesture start, and trigger `invalidatePreview()` so live playback and waveform/LUFS readouts reflect the soundscape immediately.
-    - Clicking **Reset FX** or **Clear Ambience** cleanly resets the soundscape back to `'none'` / `0%`.
+  - **Waveform Canvas (`#wave`)**:
+    - Renders the selection overlay, In/Out handle grips, and duration badge when `S.selection.active` is true (across Waveform, Spectrum, and Spectrogram views).
+    - Pointer handlers (`pointerdown`, `pointermove`, `pointerup`) detect handle hit-testing (within `16px` CSS pixels of `In` or `Out`), region Creation (`waveTool === 'select'` or `e.shiftKey`), cue marker magnetic snapping (within `8px`), and standard playhead seeking.
+  - **Cut & Trim Toolbar (`#trimToolbar`)**:
+    - **Select Mode Toggle (`#btnWaveSelectMode`)**: Toggles between tap-to-seek and drag-to-select on touch devices.
+    - **Set In / Set Out (`#btnSetIn`, `#btnSetOut`)**: Sets `selection.start` or `selection.end` to the current `S.playhead` (auto-creating a valid selection if none exists). Hotkeys: `[` and `]`.
+    - **Start / End Time Inputs (`#trimInInput`, `#trimOutInput`)**: Accepts seconds or `m:ss.cc` format to nudge boundaries with `0.01s` accuracy.
+    - **Play Selection (`#btnPlaySelection`)**: Auditions `[selection.start, selection.end]` through the live FX chain.
+    - **Trim / Keep (`#btnTrimKeep`)**: Calls `applyTrimSelection()` to crop the buffer to `[selection.start, selection.end]`.
+    - **Cut / Delete (`#btnCutDelete`)**: Calls `applyCutSelection()` to remove `[selection.start, selection.end]` and splice the remaining segments. Hotkey: `Delete` / `Backspace` when a selection is active.
+    - **Trim Silence (`#btnTrimSilence`)**: Calls `applyTrimSilence()` to strip leading/trailing silence from the clip.
+    - **Clear Selection (`#btnClearSelection`)**: Resets `S.selection.active = false` (Hotkey: `Escape` when no modal is open).

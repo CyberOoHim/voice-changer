@@ -1230,6 +1230,100 @@
       color: var(--danger);
     }
 
+    /* Cut, Trim & Region Selection Toolbar */
+    .trim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 6px 10px;
+      background: rgba(15, 23, 32, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: .8rem;
+    }
+    .trim-toolbar .trim-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .trim-toolbar .btn-tool-mode.active {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.18);
+      color: #7dd3fc;
+      font-weight: 700;
+    }
+    .trim-time-inputs {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 2px;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+    .trim-time-input {
+      width: 60px;
+      min-height: 28px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .trim-time-input:focus-visible {
+      border-color: var(--accent);
+      outline: none;
+    }
+    .trim-span-badge {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      font-size: .75rem;
+      color: var(--accent2);
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(34, 211, 238, 0.1);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      white-space: nowrap;
+    }
+    .btn-trim-action {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+      font-weight: 600;
+    }
+    .btn-trim-action:hover:not(:disabled) {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-cut-action {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.35);
+      color: #fecdd3;
+      font-weight: 600;
+    }
+    .btn-cut-action:hover:not(:disabled) {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: var(--danger);
+      color: #fff;
+    }
+    .btn-silence-action {
+      background: rgba(52, 211, 153, 0.12);
+      border: 1px solid rgba(52, 211, 153, 0.35);
+      color: #6ee7b7;
+      font-weight: 600;
+    }
+    .btn-silence-action:hover:not(:disabled) {
+      background: rgba(52, 211, 153, 0.25);
+      border-color: var(--ok);
+      color: #fff;
+    }
+
     /* 2D Macro XY Morph Pad */
     .xy-pad-wrap {
       position: relative;
@@ -1901,6 +1995,30 @@
             <button type="button" id="btnAddMarker" class="btn-xs" disabled aria-label="Add cue marker at playhead" title="Add cue marker at playhead (Hotkey: M)">+ Marker (M)</button>
             <button type="button" id="btnClearMarkers" class="btn-xs" disabled aria-label="Clear all cue markers">Clear</button>
             <div id="cueMarkerList" class="cue-marker-list"></div>
+          </div>
+          <div class="trim-toolbar" id="trimToolbar" role="toolbar" aria-label="Cut, Trim and Region Selection">
+            <div class="trim-group">
+              <button type="button" id="btnWaveToolSeek" class="btn-xs btn-tool-mode active" aria-label="Seek mode" title="Seek mode: Tap to move playhead">Seek</button>
+              <button type="button" id="btnWaveToolSelect" class="btn-xs btn-tool-mode" aria-label="Region Select mode" title="Select mode: Drag to highlight an audio region (Shift+Drag on canvas)">⌸ Select</button>
+            </div>
+            <div class="trim-group">
+              <button type="button" id="btnSetIn" class="btn-xs" disabled aria-label="Set region In point at playhead" title="Set region In point at playhead (Hotkey: [)">[ In</button>
+              <button type="button" id="btnSetOut" class="btn-xs" disabled aria-label="Set region Out point at playhead" title="Set region Out point at playhead (Hotkey: ])">] Out</button>
+            </div>
+            <div class="trim-time-inputs" id="trimTimeInputs" aria-label="Region start and end times">
+              <span>In:</span>
+              <input type="text" id="trimInInput" class="trim-time-input" value="0:00.00" disabled aria-label="Region In time" />
+              <span>Out:</span>
+              <input type="text" id="trimOutInput" class="trim-time-input" value="0:00.00" disabled aria-label="Region Out time" />
+              <span id="trimSpanBadge" class="trim-span-badge" title="Selected region duration">0.00s</span>
+            </div>
+            <div class="trim-group">
+              <button type="button" id="btnPlaySelection" class="btn-xs btn-trim-action" disabled aria-label="Audition selected region" title="Play only the selected audio region">▶ Play Sel</button>
+              <button type="button" id="btnTrimKeep" class="btn-xs btn-trim-action" disabled aria-label="Trim: Keep selected region and discard outside" title="Trim: Crop clip to selected region">✂ Trim</button>
+              <button type="button" id="btnCutDelete" class="btn-xs btn-cut-action" disabled aria-label="Cut: Delete selected region with click-free crossfade" title="Cut: Remove selected region (Backspace / Del)">🗑 Cut</button>
+              <button type="button" id="btnTrimSilence" class="btn-xs btn-silence-action" disabled aria-label="Auto-trim leading and trailing silence" title="Auto-detect &amp; strip dead air below -45dB">✨ Trim Silence</button>
+              <button type="button" id="btnClearSelection" class="btn-xs btn-ghost" disabled aria-label="Clear active selection" title="Clear selection (Esc)">×</button>
+            </div>
           </div>
           <div class="transport" role="toolbar" aria-label="Transport">
             <span class="skip-desktop">

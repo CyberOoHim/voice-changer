@@ -164,6 +164,206 @@
     }
 
     /* -------------------------------------------------------------
+       Audio Cut, Trim & Silence Stripping (Click-Free Splicing)
+       ------------------------------------------------------------- */
+    function findZeroCrossing(channelData, targetFrame, maxSearchFrames = 96) {
+      if (!channelData || !channelData.length) return targetFrame;
+      const n = channelData.length;
+      const clampedTarget = Math.max(0, Math.min(n - 1, targetFrame));
+      if (Math.abs(channelData[clampedTarget]) < 1e-4) return clampedTarget;
+
+      let bestFrame = clampedTarget;
+      let minAbs = Math.abs(channelData[clampedTarget]);
+      const start = Math.max(0, clampedTarget - maxSearchFrames);
+      const end = Math.min(n - 1, clampedTarget + maxSearchFrames);
+
+      // Search for sign change (true zero crossing)
+      for (let i = start; i < end; i++) {
+        const s1 = channelData[i];
+        const s2 = channelData[i + 1];
+        if ((s1 <= 0 && s2 >= 0) || (s1 >= 0 && s2 <= 0)) {
+          // Found zero crossing; pick whichever sample is closest to zero
+          return Math.abs(s1) <= Math.abs(s2) ? i : (i + 1);
+        }
+        const a = Math.abs(s1);
+        if (a < minAbs) {
+          minAbs = a;
+          bestFrame = i;
+        }
+      }
+      return bestFrame;
+    }
+
+    function trimBuffer(buf, startSec, endSec, opts = {}) {
+      if (!buf || !buf.length) return buf;
+      const sr = buf.sampleRate;
+      const numCh = buf.numberOfChannels;
+      const dur = buf.duration;
+      const inSec = Math.max(0, Math.min(dur, Math.min(startSec, endSec)));
+      const outSec = Math.max(0, Math.min(dur, Math.max(startSec, endSec)));
+      if (outSec - inSec <= 0.001) return buf;
+
+      const ch0 = buf.getChannelData(0);
+      const searchRadius = Math.max(1, Math.floor(0.002 * sr)); // 2ms search window
+      const inFrame = findZeroCrossing(ch0, Math.floor(inSec * sr), searchRadius);
+      const outFrame = findZeroCrossing(ch0, Math.ceil(outSec * sr), searchRadius);
+      const cropLen = Math.max(1, outFrame - inFrame);
+
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(numCh, cropLen, sr);
+      const fadeFrames = Math.min(Math.floor(cropLen * 0.45), Math.max(1, Math.floor((opts.fadeSec || 0.005) * sr)));
+
+      for (let c = 0; c < numCh; c++) {
+        const srcData = buf.getChannelData(c);
+        const destData = out.getChannelData(c);
+        destData.set(srcData.subarray(inFrame, inFrame + cropLen));
+
+        // 5ms micro fade-in at head to guarantee zero click
+        for (let i = 0; i < fadeFrames; i++) {
+          const t = i / fadeFrames;
+          const g = Math.sin(t * 0.5 * Math.PI);
+          destData[i] *= g;
+        }
+        // 5ms micro fade-out at tail to guarantee zero click
+        for (let i = 0; i < fadeFrames; i++) {
+          const t = i / fadeFrames;
+          const g = Math.cos(t * 0.5 * Math.PI);
+          destData[cropLen - 1 - i] *= g;
+        }
+      }
+      return out;
+    }
+
+    function cutBufferRegion(buf, startSec, endSec, opts = {}) {
+      if (!buf || !buf.length) return buf;
+      const sr = buf.sampleRate;
+      const numCh = buf.numberOfChannels;
+      const dur = buf.duration;
+      const inSec = Math.max(0, Math.min(dur, Math.min(startSec, endSec)));
+      const outSec = Math.max(0, Math.min(dur, Math.max(startSec, endSec)));
+      if (outSec - inSec <= 0.001) return cloneBuffer(buf);
+
+      const ch0 = buf.getChannelData(0);
+      const searchRadius = Math.max(1, Math.floor(0.002 * sr));
+      const inFrame = findZeroCrossing(ch0, Math.floor(inSec * sr), searchRadius);
+      const outFrame = findZeroCrossing(ch0, Math.ceil(outSec * sr), searchRadius);
+
+      const headLen = inFrame;
+      const tailLen = buf.length - outFrame;
+      const fadeFrames = Math.min(
+        Math.floor(headLen * 0.4),
+        Math.floor(tailLen * 0.4),
+        Math.max(1, Math.floor((opts.crossfadeSec || 0.005) * sr))
+      );
+
+      // Equal-power micro-crossfade between head and tail
+      const totalFrames = Math.max(1, headLen + tailLen - fadeFrames);
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(numCh, totalFrames, sr);
+
+      for (let c = 0; c < numCh; c++) {
+        const srcData = buf.getChannelData(c);
+        const destData = out.getChannelData(c);
+
+        if (headLen > fadeFrames) {
+          destData.set(srcData.subarray(0, headLen - fadeFrames), 0);
+        }
+
+        // Crossfade junction
+        const junctionStart = Math.max(0, headLen - fadeFrames);
+        for (let i = 0; i < fadeFrames; i++) {
+          const t = i / fadeFrames;
+          const gainHead = Math.cos(t * 0.5 * Math.PI);
+          const gainTail = Math.sin(t * 0.5 * Math.PI);
+          const hSample = (junctionStart + i < headLen) ? srcData[junctionStart + i] : 0;
+          const tSample = (outFrame + i < buf.length) ? srcData[outFrame + i] : 0;
+          destData[junctionStart + i] = hSample * gainHead + tSample * gainTail;
+        }
+
+        // Tail after crossfade
+        if (tailLen > fadeFrames) {
+          destData.set(srcData.subarray(outFrame + fadeFrames), headLen);
+        }
+      }
+      return out;
+    }
+
+    function trimSilence(buf, opts = {}) {
+      if (!buf || !buf.length) return { buffer: buf, trimmedStartSec: 0, trimmedEndSec: 0 };
+      const threshDb = opts.thresholdDb != null ? opts.thresholdDb : -45;
+      const threshLin = dbToLin(threshDb);
+      const padSec = opts.padSec != null ? opts.padSec : 0.02; // 20ms breathing pad
+      const sr = buf.sampleRate;
+      const padFrames = Math.floor(padSec * sr);
+      const numCh = buf.numberOfChannels;
+      const n = buf.length;
+      const ch0 = buf.getChannelData(0);
+
+      // Windowed energy detection (10ms window)
+      const winSize = Math.max(1, Math.floor(0.01 * sr));
+      let startFrame = 0;
+      let endFrame = n - 1;
+
+      // Find start of sound
+      for (let i = 0; i < n - winSize; i += Math.floor(winSize / 2)) {
+        let maxVal = 0;
+        for (let j = 0; j < winSize; j++) {
+          const a = Math.abs(ch0[i + j]);
+          if (a > maxVal) maxVal = a;
+        }
+        if (maxVal >= threshLin) {
+          startFrame = Math.max(0, i - padFrames);
+          break;
+        }
+      }
+
+      // Find end of sound
+      for (let i = n - 1; i >= winSize; i -= Math.floor(winSize / 2)) {
+        let maxVal = 0;
+        for (let j = 0; j < winSize; j++) {
+          const a = Math.abs(ch0[i - j]);
+          if (a > maxVal) maxVal = a;
+        }
+        if (maxVal >= threshLin) {
+          endFrame = Math.min(n - 1, i + padFrames);
+          break;
+        }
+      }
+
+      if (startFrame >= endFrame || (endFrame - startFrame) < sr * 0.05) {
+        // Entire buffer is silent or too short, return clone
+        return { buffer: cloneBuffer(buf), trimmedStartSec: 0, trimmedEndSec: 0 };
+      }
+
+      // Snap to zero crossing
+      const searchRadius = Math.max(1, Math.floor(0.002 * sr));
+      startFrame = findZeroCrossing(ch0, startFrame, searchRadius);
+      endFrame = findZeroCrossing(ch0, endFrame, searchRadius);
+
+      const croppedLen = endFrame - startFrame + 1;
+      const ctx = ensureAudioCtx();
+      const out = ctx.createBuffer(numCh, croppedLen, sr);
+      const fadeFrames = Math.min(Math.floor(croppedLen * 0.4), Math.max(1, Math.floor(0.008 * sr)));
+
+      for (let c = 0; c < numCh; c++) {
+        const src = buf.getChannelData(c);
+        const dest = out.getChannelData(c);
+        dest.set(src.subarray(startFrame, endFrame + 1));
+
+        // Smooth 8ms micro fades at boundaries
+        for (let i = 0; i < fadeFrames; i++) {
+          const t = i / fadeFrames;
+          dest[i] *= Math.sin(t * 0.5 * Math.PI);
+          dest[croppedLen - 1 - i] *= Math.sin(t * 0.5 * Math.PI);
+        }
+      }
+
+      const trimmedStartSec = startFrame / sr;
+      const trimmedEndSec = (n - 1 - endFrame) / sr;
+      return { buffer: out, trimmedStartSec, trimmedEndSec };
+    }
+
+    /* -------------------------------------------------------------
        Vocal Cleanup: Noise Gate, Hum Notch, De-Esser
        ------------------------------------------------------------- */
     function applyNoiseGate(buf, opts) {
@@ -1638,6 +1838,10 @@
       peakOf,
       applyPeakLimiter,
       reverseBuffer,
+      findZeroCrossing,
+      trimBuffer,
+      cutBufferRegion,
+      trimSilence,
       applyNoiseGate,
       applyHumNotch,
       applyDeEsser,

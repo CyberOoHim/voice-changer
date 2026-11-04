@@ -450,6 +450,9 @@
       xyAxisMode: 'pitch-formant',
       lufsTarget: '-14',
       cueMarkers: [],
+      selection: { active: false, start: 0, end: 0 },
+      waveTool: 'seek',
+      selectionAudition: null,
       ecoActive: false,
       ui: {
         ecoMode: 'auto',
@@ -543,6 +546,18 @@
       btnAddMarker: $('btnAddMarker'),
       btnClearMarkers: $('btnClearMarkers'),
       cueMarkerList: $('cueMarkerList'),
+      btnWaveToolSeek: $('btnWaveToolSeek'),
+      btnWaveToolSelect: $('btnWaveToolSelect'),
+      btnSetIn: $('btnSetIn'),
+      btnSetOut: $('btnSetOut'),
+      trimInInput: $('trimInInput'),
+      trimOutInput: $('trimOutInput'),
+      trimSpanBadge: $('trimSpanBadge'),
+      btnPlaySelection: $('btnPlaySelection'),
+      btnTrimKeep: $('btnTrimKeep'),
+      btnCutDelete: $('btnCutDelete'),
+      btnTrimSilence: $('btnTrimSilence'),
+      btnClearSelection: $('btnClearSelection'),
       btnPlay: $('btnPlay'),
       btnStop: $('btnStop'),
       btnLoop: $('btnLoop'),
@@ -955,6 +970,10 @@
     const synthesizeDemoVoice = fxApi.synthesizeDemoVoice;
     const getAmbienceScenes = fxApi.getAmbienceScenes;
     const applyAmbienceSoundscape = fxApi.applyAmbienceSoundscape;
+    const findZeroCrossing = fxApi.findZeroCrossing;
+    const trimBuffer = fxApi.trimBuffer;
+    const cutBufferRegion = fxApi.cutBufferRegion;
+    const trimSilence = fxApi.trimSilence;
 
     /* =========================================================
        Persistence
@@ -1205,6 +1224,8 @@
         activeCustomId: S.activeCustomId,
         inputGain: S.inputGain,
         playhead: S.playhead,
+        selection: S.selection ? { ...S.selection } : { active: false, start: 0, end: 0 },
+        cueMarkers: S.cueMarkers ? JSON.parse(JSON.stringify(S.cueMarkers)) : [],
         hasBuffer: includeBuffer,
         bufferDropped: false,
         buffer: includeBuffer ? cloneBuffer(S.buffer) : null
@@ -1323,6 +1344,17 @@
         }
       }
       invalidatePreview();
+
+      if (snap.selection) {
+        S.selection = { ...snap.selection };
+      } else {
+        S.selection = { active: false, start: 0, end: 0 };
+      }
+      if (Array.isArray(snap.cueMarkers)) {
+        S.cueMarkers = JSON.parse(JSON.stringify(snap.cueMarkers));
+        renderCueMarkers();
+      }
+      updateTrimUI();
 
       rebuildFxPanel();
       syncGainSlidersUI();
@@ -2021,6 +2053,7 @@
       S.playing = false;
       cancelAnimationFrame(animRaf);
       if (resetHead) S.playhead = 0;
+      S.selectionAudition = null;
       updatePlayButton();
       updateTimeChip();
       drawWave();
@@ -2159,6 +2192,23 @@
         }
         lastPlayAnimTime = now || performance.now();
         const t = playOffset + (ctx.currentTime - playStartedAt) * rate;
+        if (S.selectionAudition) {
+          if (t >= S.selectionAudition.end) {
+            if (S.selectionAudition.loop || S.loop) {
+              S.playhead = S.selectionAudition.start;
+              startPlayback();
+              return;
+            } else {
+              stopPlayback(false);
+              S.playhead = S.selectionAudition.end;
+              S.selectionAudition = null;
+              updatePlayButton();
+              updateTimeChip();
+              drawWave();
+              return;
+            }
+          }
+        }
         S.playhead = Math.min(buf.duration, Math.max(0, t));
         updateTimeChip();
         drawWave();
@@ -2521,6 +2571,93 @@
         }
       }
 
+      // Draw Region Selection & Boundary Handles
+      if (S.selection && S.selection.active && S.buffer) {
+        const selStart = Math.min(S.selection.start, S.selection.end);
+        const selEnd = Math.max(S.selection.start, S.selection.end);
+        const inNorm = selStart / dur;
+        const outNorm = selEnd / dur;
+        const inX = ((inNorm - view.start) / view.span) * w;
+        const outX = ((outNorm - view.start) / view.span) * w;
+        const leftX = Math.max(0, Math.min(w, Math.min(inX, outX)));
+        const rightX = Math.max(0, Math.min(w, Math.max(inX, outX)));
+
+        // Dim unselected audio
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.58)';
+        if (leftX > 0) ctx.fillRect(0, 0, leftX, h);
+        if (rightX < w) ctx.fillRect(rightX, 0, w - rightX, h);
+
+        // Highlight selected region
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.16)';
+        ctx.fillRect(leftX, 0, Math.max(0, rightX - leftX), h);
+
+        // Top and bottom selection bounding rails
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(leftX, 1);
+        ctx.lineTo(rightX, 1);
+        ctx.moveTo(leftX, h - 1);
+        ctx.lineTo(rightX, h - 1);
+        ctx.stroke();
+
+        // In boundary line and handle
+        if (inX >= -10 && inX <= w + 10) {
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(inX, 0);
+          ctx.lineTo(inX, h);
+          ctx.stroke();
+
+          // In tactile handle flag
+          ctx.fillStyle = '#0284c7';
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(inX - 18, 0, 18, 22, [0, 0, 4, 4]);
+          } else {
+            ctx.rect(inX - 18, 0, 18, 22);
+          }
+          ctx.fill();
+          ctx.strokeStyle = '#7dd3fc';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('[ In', inX - 9, 15);
+        }
+
+        // Out boundary line and handle
+        if (outX >= -10 && outX <= w + 10) {
+          ctx.strokeStyle = '#ec4899';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(outX, 0);
+          ctx.lineTo(outX, h);
+          ctx.stroke();
+
+          // Out tactile handle flag
+          ctx.fillStyle = '#be185d';
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(outX, 0, 20, 22, [0, 0, 4, 4]);
+          } else {
+            ctx.rect(outX, 0, 20, 22);
+          }
+          ctx.fill();
+          ctx.strokeStyle = '#f472b6';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 11px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('Out]', outX + 10, 15);
+        }
+      }
+
       // Draw Playhead
       const norm = (S.playhead / dur);
       if (norm >= view.start && norm <= view.end) {
@@ -2531,6 +2668,264 @@
         ctx.moveTo(px, 0);
         ctx.lineTo(px, h);
         ctx.stroke();
+      }
+    }
+
+    /* =========================================================
+       Trim, Cut & Region Editing Suite
+       ========================================================= */
+    function timeFromWaveX(clientX) {
+      if (!S.buffer || !els.wave) return 0;
+      const rect = els.wave.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const view = viewWindow();
+      return (view.start + (x / rect.width) * view.span) * S.buffer.duration;
+    }
+
+    function xFromWaveTime(timeSec) {
+      if (!S.buffer || !els.wave) return 0;
+      const rect = els.wave.getBoundingClientRect();
+      const view = viewWindow();
+      const norm = timeSec / S.buffer.duration;
+      return ((norm - view.start) / view.span) * rect.width;
+    }
+
+    function setWaveTool(mode) {
+      S.waveTool = mode === 'select' ? 'select' : 'seek';
+      if (els.btnWaveToolSeek) {
+        const isSeek = S.waveTool === 'seek';
+        els.btnWaveToolSeek.classList.toggle('active', isSeek);
+        els.btnWaveToolSeek.setAttribute('aria-pressed', String(isSeek));
+      }
+      if (els.btnWaveToolSelect) {
+        const isSel = S.waveTool === 'select';
+        els.btnWaveToolSelect.classList.toggle('active', isSel);
+        els.btnWaveToolSelect.setAttribute('aria-pressed', String(isSel));
+      }
+      if (els.wave) {
+        els.wave.style.cursor = S.waveTool === 'select' ? 'crosshair' : 'pointer';
+      }
+    }
+
+    function parseTimeInput(str) {
+      if (!str) return null;
+      const s = String(str).trim();
+      if (!s) return null;
+      if (s.includes(':')) {
+        const parts = s.split(':');
+        if (parts.length === 2) {
+          const m = parseFloat(parts[0]);
+          const sec = parseFloat(parts[1]);
+          if (!isNaN(m) && !isNaN(sec)) return m * 60 + sec;
+        }
+      }
+      const num = parseFloat(s);
+      return !isNaN(num) && isFinite(num) ? num : null;
+    }
+
+    function updateTrimUI() {
+      const hasAudio = !!S.buffer && !S.baking;
+      const hasSel = !!(hasAudio && S.selection && S.selection.active);
+      const dur = S.buffer ? S.buffer.duration : 0;
+
+      if (els.btnWaveToolSeek) els.btnWaveToolSeek.disabled = !hasAudio;
+      if (els.btnWaveToolSelect) els.btnWaveToolSelect.disabled = !hasAudio;
+      if (els.btnSetIn) els.btnSetIn.disabled = !hasAudio;
+      if (els.btnSetOut) els.btnSetOut.disabled = !hasAudio;
+      if (els.btnTrimSilence) els.btnTrimSilence.disabled = !hasAudio;
+
+      if (els.btnPlaySelection) els.btnPlaySelection.disabled = !hasSel;
+      if (els.btnTrimKeep) els.btnTrimKeep.disabled = !hasSel;
+      if (els.btnCutDelete) els.btnCutDelete.disabled = !hasSel;
+      if (els.btnClearSelection) els.btnClearSelection.disabled = !hasSel;
+
+      if (els.trimInInput) {
+        els.trimInInput.disabled = !hasAudio;
+        if (!els.trimInInput.matches(':focus')) {
+          els.trimInInput.value = hasSel ? fmtTime(S.selection.start) : '0:00.00';
+        }
+      }
+      if (els.trimOutInput) {
+        els.trimOutInput.disabled = !hasAudio;
+        if (!els.trimOutInput.matches(':focus')) {
+          els.trimOutInput.value = hasSel ? fmtTime(S.selection.end) : fmtTime(dur);
+        }
+      }
+      if (els.trimSpanBadge) {
+        if (hasSel) {
+          const span = Math.max(0, S.selection.end - S.selection.start);
+          els.trimSpanBadge.textContent = span.toFixed(2) + 's';
+          els.trimSpanBadge.style.opacity = '1';
+        } else {
+          els.trimSpanBadge.textContent = '0.00s';
+          els.trimSpanBadge.style.opacity = '0.5';
+        }
+      }
+    }
+
+    function setSelection(start, end) {
+      if (!S.buffer) return;
+      const dur = S.buffer.duration;
+      const s0 = Math.max(0, Math.min(dur, Math.min(start, end)));
+      const s1 = Math.max(0, Math.min(dur, Math.max(start, end)));
+      if (s1 - s0 < 0.005) {
+        clearSelection();
+        return;
+      }
+      S.selection = {
+        active: true,
+        start: Math.round(s0 * 1000) / 1000,
+        end: Math.round(s1 * 1000) / 1000
+      };
+      updateTrimUI();
+      drawWave();
+    }
+
+    function clearSelection() {
+      S.selection = { active: false, start: 0, end: 0 };
+      if (S.selectionAudition) {
+        stopPlayback(false);
+        S.selectionAudition = null;
+      }
+      updateTrimUI();
+      drawWave();
+    }
+
+    function setInPoint() {
+      if (!S.buffer) return;
+      const inPt = Math.max(0, Math.min(S.buffer.duration, S.playhead));
+      const outPt = S.selection.active ? Math.max(inPt + 0.05, S.selection.end) : S.buffer.duration;
+      setSelection(inPt, outPt);
+      toast('In point set to ' + fmtTime(inPt));
+    }
+
+    function setOutPoint() {
+      if (!S.buffer) return;
+      const outPt = Math.max(0, Math.min(S.buffer.duration, S.playhead));
+      const inPt = S.selection.active ? Math.min(outPt - 0.05, S.selection.start) : 0;
+      setSelection(inPt, outPt);
+      toast('Out point set to ' + fmtTime(outPt));
+    }
+
+    function playSelection(loop = false) {
+      if (!S.buffer || !S.selection || !S.selection.active) return;
+      const start = Math.min(S.selection.start, S.selection.end);
+      const end = Math.max(S.selection.start, S.selection.end);
+      if (end - start <= 0.005) return;
+      S.playhead = start;
+      S.selectionAudition = { start, end, loop };
+      startPlayback();
+    }
+
+    function applyTrimSelection() {
+      if (!S.buffer || !S.selection || !S.selection.active || S.baking) return;
+      const start = Math.min(S.selection.start, S.selection.end);
+      const end = Math.max(S.selection.start, S.selection.end);
+      if (end - start < 0.02) {
+        toast('Selection is too small to trim.', 'error');
+        return;
+      }
+      stopPlayback(false);
+      pushHistory({ includeBuffer: true });
+
+      try {
+        const trimmed = trimBuffer(S.buffer, start, end, { crossfadeSec: 0.005, snapZeroCrossing: true });
+        const offset = start;
+        S.cueMarkers = (S.cueMarkers || [])
+          .filter((m) => m.time >= start && m.time <= end)
+          .map((m) => ({ ...m, time: Math.round(Math.max(0, m.time - offset) * 100) / 100 }));
+
+        S.buffer = trimmed;
+        S.peakPyramid = buildPeakPyramid(trimmed);
+        S.playhead = 0;
+        clearSelection();
+        invalidatePreview();
+        updateTimeChip();
+        renderCueMarkers();
+        updateTransportEnabled();
+        drawWave();
+        toast('Trimmed clip to selection (' + fmtTime(trimmed.duration) + '). Undo with Ctrl+Z.', 'ok');
+      } catch (err) {
+        console.error('Trim error:', err);
+        if (undoStack.length) releaseSnap(undoStack.pop());
+        updateUndoButtons();
+        toast('Failed to trim audio: ' + (err.message || 'error'), 'error');
+      }
+    }
+
+    function applyCutSelection() {
+      if (!S.buffer || !S.selection || !S.selection.active || S.baking) return;
+      const start = Math.min(S.selection.start, S.selection.end);
+      const end = Math.max(S.selection.start, S.selection.end);
+      const cutSpan = end - start;
+      if (cutSpan < 0.005) {
+        toast('Selection is too small to cut.', 'error');
+        return;
+      }
+      stopPlayback(false);
+      pushHistory({ includeBuffer: true });
+
+      try {
+        const cut = cutBufferRegion(S.buffer, start, end, { crossfadeSec: 0.005, snapZeroCrossing: true });
+        S.cueMarkers = (S.cueMarkers || [])
+          .filter((m) => m.time < start || m.time > end)
+          .map((m) => (m.time > end ? { ...m, time: Math.round(Math.max(0, m.time - cutSpan) * 100) / 100 } : m));
+
+        S.buffer = cut;
+        S.peakPyramid = buildPeakPyramid(cut);
+        S.playhead = Math.min(cut.duration, start);
+        clearSelection();
+        invalidatePreview();
+        updateTimeChip();
+        renderCueMarkers();
+        updateTransportEnabled();
+        drawWave();
+        toast('Cut selected audio. Splice crossfade applied. Undo with Ctrl+Z.', 'ok');
+      } catch (err) {
+        console.error('Cut error:', err);
+        if (undoStack.length) releaseSnap(undoStack.pop());
+        updateUndoButtons();
+        toast('Failed to cut audio region: ' + (err.message || 'error'), 'error');
+      }
+    }
+
+    function applyTrimSilence() {
+      if (!S.buffer || S.baking) return;
+      stopPlayback(false);
+      pushHistory({ includeBuffer: true });
+
+      try {
+        const res = trimSilence(S.buffer, { thresholdDb: -45, padSec: 0.05 });
+        if (res.trimmedStartSec === 0 && res.trimmedEndSec === 0) {
+          if (undoStack.length) releaseSnap(undoStack.pop());
+          updateUndoButtons();
+          toast('No dead air / silence detected below -45 dB at clip boundaries.');
+          return;
+        }
+
+        const head = res.trimmedStartSec;
+        const tail = res.trimmedEndSec;
+        const newDur = res.buffer.duration;
+
+        S.cueMarkers = (S.cueMarkers || [])
+          .filter((m) => m.time >= head && m.time <= head + newDur)
+          .map((m) => ({ ...m, time: Math.round(Math.max(0, m.time - head) * 100) / 100 }));
+
+        S.buffer = res.buffer;
+        S.peakPyramid = buildPeakPyramid(res.buffer);
+        S.playhead = Math.max(0, Math.min(newDur, S.playhead - head));
+        clearSelection();
+        invalidatePreview();
+        updateTimeChip();
+        renderCueMarkers();
+        updateTransportEnabled();
+        drawWave();
+        toast('Trimmed silence (' + head.toFixed(2) + 's head, ' + tail.toFixed(2) + 's tail). Undo with Ctrl+Z.', 'ok');
+      } catch (err) {
+        console.error('Trim silence error:', err);
+        if (undoStack.length) releaseSnap(undoStack.pop());
+        updateUndoButtons();
+        toast('Failed to trim silence: ' + (err.message || 'error'), 'error');
       }
     }
 
@@ -3010,6 +3405,7 @@
       S.waveViewStart = 0;
       S.lastExportBlob = null;
       S.playhead = 0;
+      S.selection = { active: false, start: 0, end: 0 };
       S.sourceName = meta.name || S.sourceName || 'Audio';
       clearHistory();
       if (meta.videoFile) {
@@ -3094,6 +3490,7 @@
       els.bakeOverlay.classList.toggle('show', S.baking);
       if (els.dropzone) els.dropzone.classList.toggle('busy', S.loading);
       updateRecordHistoryUI();
+      updateTrimUI();
     }
 
     /* =========================================================
@@ -5551,6 +5948,26 @@
         addCueMarker();
         return;
       }
+      if (k === '[') {
+        e.preventDefault();
+        setInPoint();
+        return;
+      }
+      if (k === ']') {
+        e.preventDefault();
+        setOutPoint();
+        return;
+      }
+      if (k === 'Escape' && S.selection && S.selection.active) {
+        e.preventDefault();
+        clearSelection();
+        return;
+      }
+      if ((k === 'Delete' || k === 'Backspace') && S.selection && S.selection.active) {
+        e.preventDefault();
+        applyCutSelection();
+        return;
+      }
       if (/^[1-9]$/.test(k)) {
         const markerIdx = parseInt(k, 10) - 1;
         if (S.cueMarkers && S.cueMarkers[markerIdx]) {
@@ -6212,24 +6629,150 @@
         });
       }
 
-      // Waveform seek — pointer events for desktop + iPad + Android
+      // Trim & Cut Toolbar wiring
+      if (els.btnWaveToolSeek) els.btnWaveToolSeek.addEventListener('click', () => setWaveTool('seek'));
+      if (els.btnWaveToolSelect) els.btnWaveToolSelect.addEventListener('click', () => setWaveTool('select'));
+      if (els.btnSetIn) els.btnSetIn.addEventListener('click', setInPoint);
+      if (els.btnSetOut) els.btnSetOut.addEventListener('click', setOutPoint);
+      if (els.btnPlaySelection) els.btnPlaySelection.addEventListener('click', () => playSelection(false));
+      if (els.btnTrimKeep) els.btnTrimKeep.addEventListener('click', applyTrimSelection);
+      if (els.btnCutDelete) els.btnCutDelete.addEventListener('click', applyCutSelection);
+      if (els.btnTrimSilence) els.btnTrimSilence.addEventListener('click', applyTrimSilence);
+      if (els.btnClearSelection) els.btnClearSelection.addEventListener('click', clearSelection);
+
+      if (els.trimInInput) {
+        els.trimInInput.addEventListener('change', () => {
+          const val = parseTimeInput(els.trimInInput.value);
+          if (val != null && S.buffer) {
+            const inPt = Math.max(0, Math.min(S.buffer.duration, val));
+            const outPt = S.selection.active ? Math.max(inPt + 0.05, S.selection.end) : S.buffer.duration;
+            setSelection(inPt, outPt);
+          } else {
+            updateTrimUI();
+          }
+        });
+        els.trimInInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') els.trimInInput.blur();
+        });
+      }
+
+      if (els.trimOutInput) {
+        els.trimOutInput.addEventListener('change', () => {
+          const val = parseTimeInput(els.trimOutInput.value);
+          if (val != null && S.buffer) {
+            const outPt = Math.max(0, Math.min(S.buffer.duration, val));
+            const inPt = S.selection.active ? Math.min(outPt - 0.05, S.selection.start) : 0;
+            setSelection(inPt, outPt);
+          } else {
+            updateTrimUI();
+          }
+        });
+        els.trimOutInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') els.trimOutInput.blur();
+        });
+      }
+
+      // Waveform pointer events — seeking, region drag & boundary handle adjustments
       const wave = els.wave;
-      let seeking = false;
-      wave.addEventListener('pointerdown', (e) => {
-        seeking = true;
-        try { wave.setPointerCapture(e.pointerId); } catch (_) {}
-        seekFromEvent(e);
-      });
-      wave.addEventListener('pointermove', (e) => {
-        if (!seeking) return;
-        seekFromEvent(e);
-      });
-      const endSeek = (e) => {
-        seeking = false;
-        try { wave.releasePointerCapture(e.pointerId); } catch (_) {}
+      let wavePointerState = {
+        down: false,
+        mode: 'seek',
+        startX: 0,
+        startTime: 0,
+        initIn: 0,
+        initOut: 0
       };
-      wave.addEventListener('pointerup', endSeek);
-      wave.addEventListener('pointercancel', endSeek);
+
+      const getWaveHitMode = (clientX) => {
+        if (!S.buffer) return 'seek';
+        const rect = wave.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const hitTol = ('ontouchstart' in window) ? 18 : 12;
+
+        if (S.selection && S.selection.active) {
+          const inX = xFromWaveTime(S.selection.start);
+          const outX = xFromWaveTime(S.selection.end);
+          if (Math.abs(x - inX) <= hitTol) return 'handle-in';
+          if (Math.abs(x - outX) <= hitTol) return 'handle-out';
+        }
+        if (S.waveTool === 'select') return 'select';
+        return 'seek';
+      };
+
+      wave.addEventListener('pointerdown', (e) => {
+        if (!S.buffer || S.baking) return;
+        const rect = wave.getBoundingClientRect();
+        const clientX = e.clientX;
+        const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+        const t = timeFromWaveX(clientX);
+
+        let mode = getWaveHitMode(clientX);
+        if (e.shiftKey || e.altKey) mode = 'select';
+
+        wavePointerState = {
+          down: true,
+          mode,
+          startX: x,
+          startTime: t,
+          initIn: S.selection.active ? S.selection.start : t,
+          initOut: S.selection.active ? S.selection.end : t
+        };
+
+        try { wave.setPointerCapture(e.pointerId); } catch (_) {}
+
+        if (mode === 'seek') {
+          seekFromEvent(e);
+        } else if (mode === 'select') {
+          setSelection(t, t);
+        }
+      });
+
+      wave.addEventListener('pointermove', (e) => {
+        if (!S.buffer) return;
+        const clientX = e.clientX;
+
+        if (!wavePointerState.down) {
+          const mode = getWaveHitMode(clientX);
+          if (mode === 'handle-in' || mode === 'handle-out') {
+            wave.style.cursor = 'ew-resize';
+          } else if (S.waveTool === 'select') {
+            wave.style.cursor = 'crosshair';
+          } else {
+            wave.style.cursor = 'pointer';
+          }
+          return;
+        }
+
+        const t = timeFromWaveX(clientX);
+        const mode = wavePointerState.mode;
+
+        if (mode === 'seek') {
+          seekFromEvent(e);
+        } else if (mode === 'select') {
+          setSelection(wavePointerState.startTime, t);
+        } else if (mode === 'handle-in') {
+          setSelection(t, wavePointerState.initOut);
+        } else if (mode === 'handle-out') {
+          setSelection(wavePointerState.initIn, t);
+        }
+      });
+
+      const endWavePointer = (e) => {
+        if (!wavePointerState.down) return;
+        const mode = wavePointerState.mode;
+        wavePointerState.down = false;
+        try { wave.releasePointerCapture(e.pointerId); } catch (_) {}
+
+        if (mode === 'select' && S.selection && S.selection.active) {
+          if (Math.abs(S.selection.end - S.selection.start) < 0.02) {
+            clearSelection();
+          }
+        }
+        wave.style.cursor = S.waveTool === 'select' ? 'crosshair' : 'pointer';
+      };
+
+      wave.addEventListener('pointerup', endWavePointer);
+      wave.addEventListener('pointercancel', endWavePointer);
 
       window.addEventListener('keydown', onKey);
       window.addEventListener('resize', () => resizeWave());

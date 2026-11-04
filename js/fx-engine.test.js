@@ -268,6 +268,76 @@ for (const scene of scenes) {
   }
 }
 
+// Test 14: Zero-Crossing Snapping
+const testSr = 48000;
+const testSine = new Float32Array(testSr);
+for (let i = 0; i < testSr; i++) {
+  testSine[i] = Math.sin((i / testSr) * Math.PI * 2 * 100); // 100 Hz
+}
+const targetIdx = 120; // non-zero point
+const snappedIdx = api.findZeroCrossing(testSine, targetIdx, 200);
+if (snappedIdx < 0 || snappedIdx >= testSr) {
+  throw new Error('findZeroCrossing out of bounds: ' + snappedIdx);
+}
+if (Math.abs(testSine[snappedIdx]) > 0.05) {
+  throw new Error('findZeroCrossing amplitude too high: ' + testSine[snappedIdx]);
+}
+
+// Test 15: trimBuffer (crop to selection with micro-fades)
+const testBuf2s = ctx.createBuffer(1, testSr * 2, testSr);
+for (let i = 0; i < testSr * 2; i++) {
+  testBuf2s.getChannelData(0)[i] = Math.sin((i / testSr) * Math.PI * 2 * 220) * 0.5;
+}
+const trimmed1s = api.trimBuffer(testBuf2s, 0.5, 1.5, { crossfadeSec: 0.005, snapZeroCrossing: true });
+if (!trimmed1s || trimmed1s.numberOfChannels !== 1) {
+  throw new Error('trimBuffer returned invalid buffer');
+}
+const trimmedDur = trimmed1s.duration;
+if (trimmedDur < 0.95 || trimmedDur > 1.05) {
+  throw new Error('trimBuffer duration mismatch: expected ~1.0s, got ' + trimmedDur);
+}
+// Verify micro-fade ramp at start & end
+const trimStartVal = Math.abs(trimmed1s.getChannelData(0)[0]);
+const trimEndVal = Math.abs(trimmed1s.getChannelData(0)[trimmed1s.length - 1]);
+if (trimStartVal > 0.05) throw new Error('trimBuffer start fade missing: ' + trimStartVal);
+if (trimEndVal > 0.05) throw new Error('trimBuffer end fade missing: ' + trimEndVal);
+
+// Test 16: cutBufferRegion (excise selection & splice crossfade)
+const testBuf3s = ctx.createBuffer(1, testSr * 3, testSr);
+for (let i = 0; i < testSr * 3; i++) {
+  testBuf3s.getChannelData(0)[i] = (i < testSr) ? 0.4 : (i < testSr * 2 ? -0.4 : 0.6);
+}
+const cutBuf = api.cutBufferRegion(testBuf3s, 1.0, 2.0, { crossfadeSec: 0.005, snapZeroCrossing: true });
+if (!cutBuf || cutBuf.numberOfChannels !== 1) {
+  throw new Error('cutBufferRegion returned invalid buffer');
+}
+if (cutBuf.duration < 1.95 || cutBuf.duration > 2.05) {
+  throw new Error('cutBufferRegion duration mismatch: expected ~2.0s, got ' + cutBuf.duration);
+}
+
+// Test 17: trimSilence (automatic leading and trailing dead air removal)
+const testSilenceBuf = ctx.createBuffer(1, testSr * 2, testSr);
+const sData = testSilenceBuf.getChannelData(0);
+// 0.0s to 0.5s: silence (zeros)
+// 0.5s to 1.5s: tone (0.5 amp)
+for (let i = Math.floor(testSr * 0.5); i < Math.floor(testSr * 1.5); i++) {
+  sData[i] = Math.sin((i / testSr) * Math.PI * 2 * 440) * 0.5;
+}
+// 1.5s to 2.0s: silence (zeros)
+const silenceRes = api.trimSilence(testSilenceBuf, { thresholdDb: -45, padSec: 0.05 });
+if (!silenceRes || !silenceRes.buffer) {
+  throw new Error('trimSilence returned invalid result');
+}
+if (silenceRes.trimmedStartSec < 0.4) {
+  throw new Error('trimSilence leading silence under-detected: ' + silenceRes.trimmedStartSec);
+}
+if (silenceRes.trimmedEndSec < 0.4) {
+  throw new Error('trimSilence trailing silence under-detected: ' + silenceRes.trimmedEndSec);
+}
+if (silenceRes.buffer.duration > 1.2 || silenceRes.buffer.duration < 0.95) {
+  throw new Error('trimSilence resulting duration unexpected: ' + silenceRes.buffer.duration);
+}
+
 console.log('fx-engine smoke ok', {
   mono: mono.length,
   wav: wav.size,
@@ -278,7 +348,14 @@ console.log('fx-engine smoke ok', {
   normLufs: normLufs.lufs.toFixed(2),
   presets: presetsRaw.presets.length,
   demoVoices: demoVoices.length,
-  ambienceScenes: scenes.length
+  ambienceScenes: scenes.length,
+  cutTrim: {
+    snappedIdx,
+    trimmedDur: trimmedDur.toFixed(3),
+    cutDur: cutBuf.duration.toFixed(3),
+    silenceHead: silenceRes.trimmedStartSec.toFixed(3),
+    silenceTail: silenceRes.trimmedEndSec.toFixed(3)
+  }
 });
 
 
