@@ -2033,7 +2033,7 @@
     /* =========================================================
        Playback
        ========================================================= */
-    function stopPlayback(resetHead = false) {
+    function stopPlayback(resetHead = false, keepAudition = false) {
       if (playSource) {
         try { playSource.onended = null; playSource.stop(); } catch (_) {}
         try { playSource.disconnect(); } catch (_) {}
@@ -2047,13 +2047,23 @@
       if (S.playing) {
         const ctx = audioCtx;
         if (ctx) {
-          S.playhead = Math.min(S.buffer ? S.buffer.duration : 0, playOffset + Math.max(0, (ctx.currentTime - playStartedAt) * (S._playRate || 1)));
+          let pos = playOffset + Math.max(0, (ctx.currentTime - playStartedAt) * (S._playRate || 1));
+          if (S.selectionAudition) {
+            pos = Math.min(S.selectionAudition.end, Math.max(S.selectionAudition.start, pos));
+          } else {
+            pos = Math.min(S.buffer ? S.buffer.duration : 0, pos);
+          }
+          S.playhead = pos;
         }
       }
       S.playing = false;
       cancelAnimationFrame(animRaf);
-      if (resetHead) S.playhead = 0;
-      S.selectionAudition = null;
+      if (resetHead) {
+        S.playhead = S.selectionAudition ? S.selectionAudition.start : 0;
+      }
+      if (!keepAudition) {
+        S.selectionAudition = null;
+      }
       updatePlayButton();
       updateTimeChip();
       drawWave();
@@ -2067,6 +2077,12 @@
     function updatePlayButton() {
       els.btnPlay.textContent = S.playing ? '⏸ Pause' : '▶ Play';
       els.btnPlay.setAttribute('aria-label', S.playing ? 'Pause' : 'Play');
+      if (els.btnPlaySelection) {
+        const isAuditioning = S.playing && !!S.selectionAudition;
+        els.btnPlaySelection.textContent = isAuditioning ? '■ Stop Sel' : '▶ Play Sel';
+        els.btnPlaySelection.classList.toggle('btn-primary', isAuditioning);
+        els.btnPlaySelection.setAttribute('aria-label', isAuditioning ? 'Stop selection audition' : 'Audition selected region');
+      }
     }
 
     function setDry(on, notify = false) {
@@ -2098,7 +2114,7 @@
       if (!S.buffer || S.baking) return;
       markAudioActive();
       const ctx = ensureAudioCtx();
-      stopPlayback(false);
+      stopPlayback(false, true);
 
       const dry = S.comparingDry;
       let buf = dry ? S.buffer : (S.previewBuf || S.buffer);
@@ -2139,7 +2155,17 @@
       }
 
       src.connect(chain.input);
-      const offset = Math.max(0, Math.min(buf.duration - 0.001, S.playhead));
+      let offset = Math.max(0, Math.min(buf.duration - 0.001, S.playhead));
+
+      let auditionDuration = null;
+      if (S.selectionAudition) {
+        if (offset < S.selectionAudition.start || offset >= S.selectionAudition.end - 0.001) {
+          offset = S.selectionAudition.start;
+          S.playhead = offset;
+        }
+        auditionDuration = Math.max(0.001, S.selectionAudition.end - offset);
+      }
+
       playOffset = offset;
       playStartedAt = ctx.currentTime;
       playSource = src;
@@ -2148,6 +2174,22 @@
 
       src.onended = () => {
         if (!S.playing) return;
+        if (S.selectionAudition) {
+          if (S.selectionAudition.loop || S.loop) {
+            S.playhead = S.selectionAudition.start;
+            startPlayback();
+            return;
+          } else {
+            const end = S.selectionAudition.end;
+            stopPlayback(false);
+            S.playhead = end;
+            updatePlayButton();
+            updateTimeChip();
+            drawWave();
+            syncVideo();
+            return;
+          }
+        }
         if (S.loop) {
           S.playhead = 0;
           startPlayback();
@@ -2167,7 +2209,11 @@
       };
 
       try {
-        src.start(0, offset);
+        if (auditionDuration != null) {
+          src.start(0, offset, auditionDuration);
+        } else {
+          src.start(0, offset);
+        }
       } catch (e) {
         S.playing = false;
         toast('Playback failed — try again.', 'error');
@@ -2199,17 +2245,20 @@
               startPlayback();
               return;
             } else {
+              const end = S.selectionAudition.end;
               stopPlayback(false);
-              S.playhead = S.selectionAudition.end;
-              S.selectionAudition = null;
+              S.playhead = end;
               updatePlayButton();
               updateTimeChip();
               drawWave();
+              syncVideo();
               return;
             }
           }
         }
-        S.playhead = Math.min(buf.duration, Math.max(0, t));
+        S.playhead = S.selectionAudition
+          ? Math.min(S.selectionAudition.end, Math.max(S.selectionAudition.start, t))
+          : Math.min(buf.duration, Math.max(0, t));
         updateTimeChip();
         drawWave();
         syncVideo(true);
@@ -2222,6 +2271,7 @@
       if (!S.buffer || S.baking) return;
       if (S.playing) stopPlayback(false);
       else {
+        S.selectionAudition = null;
         if (S.playhead >= (S.buffer.duration - 0.02)) S.playhead = 0;
         startPlayback();
       }
@@ -2247,6 +2297,7 @@
 
     function skip(deltaSec) {
       if (!S.buffer || S.baking) return;
+      S.selectionAudition = null;
       const wasPlaying = S.playing;
       const target = S.playhead + deltaSec;
       const clamped = Math.max(0, Math.min(S.buffer.duration, target));
@@ -2357,6 +2408,7 @@
 
     function seekToCueMarker(index) {
       if (!S.buffer || !S.cueMarkers[index]) return;
+      S.selectionAudition = null;
       const m = S.cueMarkers[index];
       const wasPlaying = S.playing;
       S.playhead = m.time;
@@ -2765,6 +2817,9 @@
 
     function setSelection(start, end) {
       if (!S.buffer) return;
+      if (S.selectionAudition) {
+        stopPlayback(false);
+      }
       const dur = S.buffer.duration;
       const s0 = Math.max(0, Math.min(dur, Math.min(start, end)));
       const s1 = Math.max(0, Math.min(dur, Math.max(start, end)));
@@ -2809,9 +2864,14 @@
 
     function playSelection(loop = false) {
       if (!S.buffer || !S.selection || !S.selection.active) return;
+      if (S.playing && S.selectionAudition) {
+        stopPlayback(false);
+        return;
+      }
       const start = Math.min(S.selection.start, S.selection.end);
       const end = Math.max(S.selection.start, S.selection.end);
       if (end - start <= 0.005) return;
+      stopPlayback(false);
       S.playhead = start;
       S.selectionAudition = { start, end, loop };
       startPlayback();
@@ -2931,6 +2991,7 @@
 
     function seekFromEvent(e) {
       if (!S.buffer || S.baking) return;
+      S.selectionAudition = null;
       const rect = els.wave.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
